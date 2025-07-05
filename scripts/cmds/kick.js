@@ -28,13 +28,13 @@ module.exports = {
 	onStart: async function ({ message, event, args, threadsData, api, getLang }) {
 		const adminIDs = await threadsData.get(event.threadID, "adminIDs");
 		if (!adminIDs.includes(api.getCurrentUserID()))
-			return message.reply(getLang("needAdmin"));
+			return message.reply(getLang("100090895866311"));
 		async function kickAndCheckError(uid) {
 			try {
 				await api.removeUserFromGroup(uid, event.threadID);
 			}
 			catch (e) {
-				message.reply(getLang("needAdmin"));
+				message.reply(getLang("100090895866311"));
 				return "ERROR";
 			}
 		}
