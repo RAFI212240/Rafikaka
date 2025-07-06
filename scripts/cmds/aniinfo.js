@@ -1,79 +1,64 @@
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
 
 module.exports = {
   config: {
-    name: "aniinfo",
-    aliases: ["animeinfo", "a-info"],
-    version: "1.0",
-    author: "nexo_here",
-    countDown: 0,
+    name: "animeinfo",
+    version: "3.0",
+    author: "OpenAI",
+    countDown: 10,
     role: 0,
-    description: "Get anime information using Jikan API",
+    shortDescription: "Anime info + auto video",
+    longDescription: "Get full info of any anime by name, plus an auto-fetched YouTube video!",
     category: "anime",
-    guide: {
-      en: "{pn} [anime name] — shows anime details using Jikan API"
-    }
+    guide: "{pn} <anime name>",
   },
 
-  onStart: async function ({ api, event, args }) {
-    const query = args.join(" ");
-    if (!query) {
-      return api.sendMessage("❗ Anime name missing. Try: aniinfo demon slayer", event.threadID);
-    }
+  onStart: async function ({ message, args }) {
+    if (!args[0]) return message.reply("❌ Please provide an anime name!\nExample: animeinfo naruto");
+
+    const animeName = args.join(" ");
+    const loading = await message.reply("🔎 Searching for anime info & video...");
 
     try {
-      const res = await axios.get(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(query)}&limit=1`);
+      // 1. Get anime info from Jikan API
+      const res = await axios.get(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(animeName)}&limit=1`);
+      if (!res.data.data.length) return message.reply("❌ No anime found with that name!");
+
       const anime = res.data.data[0];
+      const info = `🌸 𝘼𝙉𝙄𝙈𝙀 𝙄𝙉𝙁𝙊 🌸
+━━━━━━━━━━━━━━
+🎬 Name: ${anime.title}
+🈶 Japanese: ${anime.title_japanese}
+📅 Aired: ${anime.aired.string}
+📺 Type: ${anime.type}
+🔢 Episodes: ${anime.episodes}
+⭐ Score: ${anime.score}
+🔞 Rating: ${anime.rating}
+📊 Status: ${anime.status}
+🔗 [MyAnimeList](${anime.url})
+━━━━━━━━━━━━━━
+📝 Synopsis: ${anime.synopsis?.slice(0, 400) || "N/A"}...`;
 
-      if (!anime) return api.sendMessage("❌ No results found.", event.threadID);
+      // 2. Search YouTube for anime edit/AMV/trailer
+      // Using pipedapi (no API key needed)
+      const yt = await axios.get(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(anime.title + " anime edit")}&filter=videos`);
+      const videos = yt.data.items;
+      if (!videos.length) return message.reply(info + "\n\n❌ No video found!");
 
-      const {
-        title,
-        title_english,
-        type,
-        episodes,
-        status,
-        score,
-        aired,
-        synopsis,
-        images,
-        genres,
-        url
-      } = anime;
+      // Get the first video
+      const video = videos[0];
+      const videoUrl = `https://youtube.com/watch?v=${video.id}`;
+      const videoTitle = video.title;
 
-      const msg = `🎬 Title: ${title_english || title}
-📺 Type: ${type}
-📊 Score: ${score || "?"}/10
-📡 Status: ${status}
-🎞 Episodes: ${episodes || "?"}
-📅 Aired: ${aired.string || "?"}
-🎭 Genres: ${genres.map(g => g.name).join(", ")}
+      // Send info + video link (direct download not possible without yt-dlp, but link works)
+      await message.reply({
+        body: info + `\n\n🎬 [${videoTitle}](${videoUrl})\n\n🔗 Watch: ${videoUrl}`,
+        // If you want to try to send as attachment, you need to use a YouTube downloader API (not recommended for copyright)
+      });
 
-📝 Description:
-${synopsis?.substring(0, 400) || "No synopsis found."}...
-
-🔗 ${url}`;
-
-      const imageURL = images.jpg.large_image_url;
-      const imgData = (await axios.get(imageURL, { responseType: "arraybuffer" })).data;
-      const filePath = path.join(__dirname, "aniinfo.jpg");
-      fs.writeFileSync(filePath, imgData);
-
-      api.sendMessage(
-        {
-          body: msg,
-          attachment: fs.createReadStream(filePath)
-        },
-        event.threadID,
-        () => fs.unlinkSync(filePath),
-        event.messageID
-      );
-
-    } catch (err) {
-      console.error(err);
-      api.sendMessage("🚫 Error fetching anime data. Please try again.", event.threadID);
+      setTimeout(() => message.unsend(loading.messageID), 3000);
+    } catch (e) {
+      message.reply("❌ Error fetching anime info or video. Try again later.");
     }
   }
 };
