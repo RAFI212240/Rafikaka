@@ -35,17 +35,6 @@ module.exports = {
 │ %4help <cmd> - Command info
 │ %4help all - All commands
 ╰───────────────────────╯`,
-      help2: `╭─────⊰ ⚡ %1 ⊱─────╮
-│ 📝 Info: %2
-│ 📂 Category: %3
-│ 💫 Usage: %4
-│ ⏱️ Cooldown: %5s
-│ 👑 Permission: %6
-│ ✨ Aliases: %7
-╰─────────────────────────╯
-
-📖 Guide:
-%8`,
       commandNotFound: `❌ Command "%1" not found`,
       getInfoCommand: `╭─────⊰ 📖 𝙄𝙉𝙁𝙊 ⊱─────╮
 │ 📌 Command: %1
@@ -60,8 +49,6 @@ module.exports = {
 
 💡 Usage:
 %9`,
-      onlyInfo: `📌 Use: %1help <command name> to see details`,
-      page: `│ Page [ %1/%2 ] │`,
       categoryEmojis: {
         "anime": "🎌",
         "media": "🎬", 
@@ -78,42 +65,42 @@ module.exports = {
     }
   },
 
-  onStart: async function ({ message, args, event, threadsData, getLang, role }) {
+  onStart: async function ({ message, args, event, threadsData, getLang, role, commandName }) {
     const { threadID } = event;
     const threadData = await threadsData.get(threadID);
-    const prefix = getPrefix(threadID);
+    const prefix = global.GoatBot.config.prefix || "/";
     const { commands } = global.GoatBot;
-    const commandName = args[0]?.toLowerCase();
+    const cmdName = args[0]?.toLowerCase();
 
     // Get all commands user can use
     const userCommands = Array.from(commands.values())
       .filter(cmd => cmd.config.role <= role)
       .sort((a, b) => a.config.name.localeCompare(b.config.name));
 
-    if (!commandName) {
+    if (!cmdName) {
       // Show page 1
       return await showHelp(message, prefix, userCommands, 1, getLang);
     }
 
-    if (!isNaN(commandName)) {
+    if (!isNaN(cmdName)) {
       // Show specific page
-      const page = parseInt(commandName);
+      const page = parseInt(cmdName);
       return await showHelp(message, prefix, userCommands, page, getLang);
     }
 
-    if (commandName === "all") {
+    if (cmdName === "all") {
       // Show all commands
       return await showAllCommands(message, prefix, userCommands, getLang);
     }
 
     // Show command details
-    const command = commands.get(commandName) || 
+    const command = commands.get(cmdName) || 
                    Array.from(commands.values()).find(cmd => 
-                     cmd.config.aliases?.includes(commandName)
+                     cmd.config.aliases?.includes(cmdName)
                    );
 
     if (!command) {
-      return message.reply(getLang("commandNotFound", commandName));
+      return message.reply(getLang("commandNotFound", cmdName));
     }
 
     return await showCommandDetails(message, prefix, command, getLang);
@@ -150,8 +137,8 @@ async function showHelp(message, prefix, commands, page, getLang) {
     
     cmds.forEach((cmd, index) => {
       const isLast = index === cmds.length - 1;
-      const prefix = isLast ? "└─" : "├─";
-      commandList += `${prefix} ${cmd.config.name}\n`;
+      const linePrefix = isLast ? "└─" : "├─";
+      commandList += `${linePrefix} ${cmd.config.name}\n`;
     });
   }
 
@@ -170,9 +157,10 @@ async function showHelp(message, prefix, commands, page, getLang) {
   const banner = banners[Math.floor(Math.random() * banners.length)];
 
   try {
+    const attachment = await global.utils.getStreamFromURL(banner);
     await message.reply({
       body: helpMsg,
-      attachment: await global.utils.getStreamFromURL(banner)
+      attachment: attachment
     });
   } catch (err) {
     await message.reply(helpMsg);
@@ -180,7 +168,6 @@ async function showHelp(message, prefix, commands, page, getLang) {
 }
 
 async function showAllCommands(message, prefix, commands, getLang) {
-  // Group all commands by category
   const categories = {};
   commands.forEach(cmd => {
     const category = cmd.config.category || "other";
@@ -210,7 +197,7 @@ async function showCommandDetails(message, prefix, command, getLang) {
 
   const roleText = {
     0: "Everyone",
-    1: "Group Admin",
+    1: "Group Admin", 
     2: "Bot Admin"
   }[role] || "Unknown";
 
@@ -231,8 +218,4 @@ async function showCommandDetails(message, prefix, command, getLang) {
   );
 
   await message.reply(info);
-}
-
-function getPrefix(threadID) {
-  return global.GoatBot.config.prefix;
-        }
+      }
