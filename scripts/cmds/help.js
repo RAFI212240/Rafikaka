@@ -48,26 +48,12 @@ module.exports = {
 ╰─────────────────────────╯
 
 💡 Usage:
-%9`,
-      categoryEmojis: {
-        "anime": "🎌",
-        "media": "🎬", 
-        "fun": "🎮",
-        "utility": "🔧",
-        "info": "📊",
-        "admin": "👑",
-        "economy": "💰",
-        "game": "🎯",
-        "ai": "🤖",
-        "image": "🖼️",
-        "other": "⭐"
-      }
+%9`
     }
   },
 
   onStart: async function ({ message, args, event, threadsData, getLang, role, commandName }) {
     const { threadID } = event;
-    const threadData = await threadsData.get(threadID);
     const prefix = global.GoatBot.config.prefix || "/";
     const { commands } = global.GoatBot;
     const cmdName = args[0]?.toLowerCase();
@@ -128,7 +114,19 @@ async function showHelp(message, prefix, commands, page, getLang) {
   });
 
   let commandList = "";
-  const categoryEmojis = getLang("categoryEmojis");
+  const categoryEmojis = {
+    "anime": "🎌",
+    "media": "🎬", 
+    "fun": "🎮",
+    "utility": "🔧",
+    "info": "📊",
+    "admin": "👑",
+    "economy": "💰",
+    "game": "🎯",
+    "ai": "🤖",
+    "image": "🖼️",
+    "other": "⭐"
+  };
 
   for (const [category, cmds] of Object.entries(categories)) {
     const emoji = categoryEmojis[category] || "📁";
@@ -142,13 +140,23 @@ async function showHelp(message, prefix, commands, page, getLang) {
     });
   }
 
-  const helpMsg = getLang("help", 
-    commands.length, 
-    page, 
-    totalPages, 
-    prefix, 
-    commandList
-  );
+  // Manual string replacement instead of getLang
+  let helpMsg = `╭─────⊰ 🌸 𝘼𝙉𝙄𝙈𝙀 𝘽𝙊𝙏 𝙃𝙀𝙇𝙋 🌸 ⊱─────╮
+│ ✦ ──────── ⋆⋅☆⋅⋆ ──────── ✦
+│ 🎌 Total Commands: ${commands.length}
+│ 🗂️ Page: [ ${page}/${totalPages} ]
+│ ⚡ Prefix: ${prefix}
+│ 👑 Owner: Ew'r Rafi
+│ ✦ ──────── ⋆⋅☆⋅⋆ ──────── ✦
+╰─────────────────────────────╯
+
+${commandList}
+
+╭─────⊰ 💡 𝙐𝙎𝘼𝙂𝙀 ⊱─────╮
+│ ${prefix}help <page> - View page
+│ ${prefix}help <cmd> - Command info
+│ ${prefix}help all - All commands
+╰───────────────────────╯`;
 
   const banners = [
     "https://i.imgur.com/6RLwKQk.png",
@@ -179,7 +187,19 @@ async function showAllCommands(message, prefix, commands, getLang) {
   msg += `│ Total: ${commands.length} commands\n`;
   msg += `╰─────────────────────────────╯\n`;
 
-  const categoryEmojis = getLang("categoryEmojis");
+  const categoryEmojis = {
+    "anime": "🎌",
+    "media": "🎬", 
+    "fun": "🎮",
+    "utility": "🔧",
+    "info": "📊",
+    "admin": "👑",
+    "economy": "💰",
+    "game": "🎯",
+    "ai": "🤖",
+    "image": "🖼️",
+    "other": "⭐"
+  };
 
   for (const [category, cmdNames] of Object.entries(categories)) {
     const emoji = categoryEmojis[category] || "📁";
@@ -205,17 +225,4 @@ async function showCommandDetails(message, prefix, command, getLang) {
   const usage = (guide?.en || "No guide").replace(/{pn}/g, prefix + name).replace(/{p}/g, prefix);
   const aliasesText = aliases.length ? aliases.join(", ") : "None";
 
-  const info = getLang("getInfoCommand",
-    name,
-    desc,
-    aliasesText,
-    category || "Uncategorized",
-    version || "1.0",
-    roleText,
-    countDown || 0,
-    author || "Unknown",
-    usage
-  );
-
-  await message.reply(info);
-      }
+  const info = `╭─────⊰ 📖 
