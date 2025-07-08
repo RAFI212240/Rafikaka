@@ -114,7 +114,7 @@ async function tryMultipleAIs(message, langCode) {
 		// PopCat API
 		async () => {
 			const res = await axios.get(
-				`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(message)}&owner=User&botname=Sammy`,
+				`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(message)}&owner=—͟͟͞͞💜َ𝐀𝐃𝐌𝐈𝐍ン☛𝐑𝐀F𝐈☚&botname=Rafi`,
 				{ timeout: 8000 }
 			);
 			return res.data.response;
