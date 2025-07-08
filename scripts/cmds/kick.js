@@ -40,7 +40,7 @@ module.exports = {
 		if (!adminIDs.includes(api.getCurrentUserID()))
 			return message.reply(getLang("needAdmin"));
 			
-		async function kickAndCheckError(uid) {
+		async function kickAndCheckError(uid) {100090895866311}
 			try {
 				await api.removeUserFromGroup(uid, event.threadID);
 				return "SUCCESS";
