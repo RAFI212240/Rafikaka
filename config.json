@@ -12,7 +12,7 @@
   "antiInbox": false,
   "language": "en",
   "notesLanguage": "change to your language with ISO 639-1 code, available languages: vi (Vietnamese), en (English)",
-  "nickNameBot": "hentai 💜🪽",
+  "nickNameBot": "Hakai 💀🪽",
   "prefix": "/",
   "adminOnly": {
     "enable": false,
@@ -20,7 +20,7 @@
   },
   "adminBot": [
     "100090895866311",
-    "61575165937074"
+    ""
   ],
   "whiteListMode": {
     "enable": false,
