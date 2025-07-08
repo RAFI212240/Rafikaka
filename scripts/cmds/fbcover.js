@@ -1,266 +1,198 @@
-const axios = require('axios');
-const fs = require('fs');
-const { createCanvas, loadImage, registerFont } = require('canvas');
-
-module.exports = {
-  config: {
-    name: 'fbcover',
-    version: '3.0',
-    author: 'Professional API',
-    countDown: 5,
-    role: 0,
-    shortDescription: 'Create professional Facebook cover',
-    longDescription: 'Create beautiful professional Facebook cover with profile picture',
-    category: 'image',
-    guide: {
-      en: '{p}{n} <name> | <subname> | <address> | <phone> | <email> | <color>',
-    }
-  },
-
-  onStart: async function ({ message, args, event, api }) {
-    try {
-      const info = args.join(' ');
-      
-      if (!info) {
-        const guideMsg = `🌸┌─────────────────┐🌸\n` +
-          `   🌟│  𝐏𝐫𝐨𝐟𝐞𝐬𝐬𝐢𝐨𝐧𝐚𝐥 𝐂𝐨𝐯𝐞𝐫   │🌟\n` +
-          `   🌸└─────────────────┘🌸\n\n` +
-          `🖤┌───【 𝐅𝐎𝐑𝐌𝐀𝐓 】───┐🦋\n` +
-          `🎀 │ /fbcover name | subname | address | phone | email | color\n` +
-          `🌷└─────────────────┘🌸\n\n` +
-          `🖤┌───【 𝐄𝐗𝐀𝐌𝐏𝐋𝐄 】───┐🦋\n` +
-          `🎀 │ /fbcover John Doe | CEO & Founder | New York, USA | +1234567890 | john@company.com | blue\n` +
-          `🌷└─────────────────┘🌸\n\n` +
-          `✨ 𝐀𝐯𝐚𝐢𝐥𝐚𝐛𝐥𝐞 𝐂𝐨𝐥𝐨𝐫𝐬: blue, red, green, purple, orange, pink, gold, black`;
-        
-        return message.reply(guideMsg);
-      }
-
-      const msg = info.split('|');
-      
-      if (msg.length < 5) {
-        return message.reply(`❌ Please provide all required information:\nname | subname | address | phone | email | color`);
-      }
-
-      const name = msg[0]?.trim();
-      const subname = msg[1]?.trim();
-      const address = msg[2]?.trim();
-      const phone = msg[3]?.trim();
-      const email = msg[4]?.trim();
-      const color = msg[5]?.trim() || 'blue';
-
-      // Processing message
-      const processingMsg = `🌸┌─────────────────┐🌸\n` +
-        `   🌟│  𝐂𝐫𝐞𝐚𝐭𝐢𝐧𝐠 𝐂𝐨𝐯𝐞𝐫...   │🌟\n` +
-        `   🌸└─────────────────┘🌸\n\n` +
-        `🖤┌───【 𝐃𝐄𝐓𝐀𝐈𝐋𝐒 】───┐🦋\n` +
-        `🎀 │ 𝐍𝐚𝐦𝐞: ${name}\n` +
-        `🎀 │ 𝐏𝐨𝐬𝐢𝐭𝐢𝐨𝐧: ${subname}\n` +
-        `🎀 │ 𝐋𝐨𝐜𝐚𝐭𝐢𝐨𝐧: ${address}\n` +
-        `🎀 │ 𝐂𝐨𝐧𝐭𝐚𝐜𝐭: ${phone}\n` +
-        `🎀 │ 𝐄𝐦𝐚𝐢𝐥: ${email}\n` +
-        `🎀 │ 𝐓𝐡𝐞𝐦𝐞: ${color}\n` +
-        `🌷└─────────────────┘🌸\n\n` +
-        `⏳ Adding your profile picture and creating professional cover... 💼✨`;
-
-      await message.reply(processingMsg);
-
-      // Try professional APIs first
-      const professionalApis = [
-        `https://api.zahwazein.xyz/photooxy/facebook-cover?name=${encodeURIComponent(name)}&text=${encodeURIComponent(subname)}&apikey=zenzkey_92266df0c4c6f4`,
-        `https://api.lolhuman.xyz/api/photooxy2/facebook?apikey=GataDios&text1=${encodeURIComponent(name)}&text2=${encodeURIComponent(subname)}`,
-        `https://api.popcat.xyz/fbcover?name=${encodeURIComponent(name)}&text=${encodeURIComponent(subname)}&color=${encodeURIComponent(color)}`,
-        `https://some-random-api.ml/canvas/fbcover?name=${encodeURIComponent(name)}&text=${encodeURIComponent(subname)}&color=${encodeURIComponent(color)}&avatar=https://graph.facebook.com/${event.senderID}/picture?width=512&height=512`
-      ];
-
-      let imageUrl = null;
-      let apiWorked = false;
-
-      // Try professional APIs
-      for (const api of professionalApis) {
-        try {
-          const response = await axios.get(api, { 
-            timeout: 15000,
-            responseType: 'arraybuffer'
-          });
-          
-          if (response.status === 200 && response.data) {
-            const tempPath = `./temp_cover_${event.senderID}.png`;
-            fs.writeFileSync(tempPath, response.data);
-            imageUrl = tempPath;
-            apiWorked = true;
-            break;
-          }
-        } catch (error) {
-          console.log(`API failed: ${api}`);
-          continue;
-        }
-      }
-
-      // If APIs fail, create professional manual cover
-      if (!apiWorked) {
-        try {
-          imageUrl = await createProfessionalCover(name, subname, address, phone, email, color, event.senderID);
-          apiWorked = true;
-        } catch (error) {
-          console.error("Professional cover creation failed:", error);
-        }
-      }
-
-      if (apiWorked && imageUrl) {
-        // Success message
-        const successMsg = `🌸┌─────────────────┐🌸\n` +
-          `   🌟│  𝐂𝐨𝐯𝐞𝐫 𝐂𝐨𝐦𝐩𝐥𝐞𝐭𝐞!   │🌟\n` +
-          `   🌸└─────────────────┘🌸\n\n` +
-          `🖤┌───【 𝐏𝐑𝐎𝐅𝐄𝐒𝐒𝐈𝐎𝐍𝐀𝐋 】───┐🦋\n` +
-          `🎀 │ ✅ Professional Facebook cover created!\n` +
-          `🎀 │ 📸 Profile picture included\n` +
-          `🎀 │ 💼 Business-ready design\n` +
-          `🎀 │ 🎨 High-quality resolution\n` +
-          `🎀 │ 💕 Enjoy your new cover, boss! 😎✨\n` +
-          `🌷└─────────────────┘🌸`;
-
-        const form = {
-          body: successMsg,
-          attachment: fs.createReadStream(imageUrl)
-        };
-
-        await message.reply(form);
-        
-        // Clean up
-        if (fs.existsSync(imageUrl)) {
-          fs.unlinkSync(imageUrl);
-        }
-      } else {
-        const errorMsg = `🌸┌─────────────────┐🌸\n` +
-          `   🌟│  𝐒𝐞𝐫𝐯𝐢𝐜𝐞 𝐄𝐫𝐫𝐨𝐫   │🌟\n` +
-          `   🌸└─────────────────┘🌸\n\n` +
-          `🖤┌───【 𝐄𝐑𝐑𝐎𝐑 】───┐🦋\n` +
-          `🎀 │ ❌ Professional APIs temporarily down\n` +
-          `🎀 │ 🔄 Please try again in a few minutes\n` +
-          `🎀 │ 📞 Contact admin if issue persists\n` +
-          `🌷└─────────────────┘🌸`;
-        
-        message.reply(errorMsg);
-      }
-
-    } catch (error) {
-      console.error("Professional FB Cover error:", error);
-      message.reply(`❌ An error occurred while creating your professional cover.`);
-    }
-  }
+module.exports.config = {
+name: "fbcover",
+version: "1.0.0",
+hasPermssion: 0,
+credits: "MR CHAND",
+description: "Create a facebook cover photo",
+commandCategory: "game",
+cooldowns: 0,
+dependencies: {
+    "fs-extra": "",
+    "request": "",
+    "axios": ""
+ }
 };
-
-// Professional cover creation with profile picture
-async function createProfessionalCover(name, subname, address, phone, email, color, senderID) {
-  try {
-    // Create canvas (Facebook cover size: 820x312)
-    const canvas = createCanvas(820, 312);
-    const ctx = canvas.getContext('2d');
-
-    // Professional color schemes
-    const colorSchemes = {
-      'blue': { primary: '#1e3a8a', secondary: '#3b82f6', accent: '#60a5fa' },
-      'red': { primary: '#991b1b', secondary: '#dc2626', accent: '#f87171' },
-      'green': { primary: '#166534', secondary: '#16a34a', accent: '#4ade80' },
-      'purple': { primary: '#581c87', secondary: '#9333ea', accent: '#a855f7' },
-      'orange': { primary: '#9a3412', secondary: '#ea580c', accent: '#fb923c' },
-      'pink': { primary: '#be185d', secondary: '#ec4899', accent: '#f472b6' },
-      'gold': { primary: '#92400e', secondary: '#d97706', accent: '#fbbf24' },
-      'black': { primary: '#111827', secondary: '#374151', accent: '#6b7280' }
-    };
-
-    const scheme = colorSchemes[color.toLowerCase()] || colorSchemes.blue;
-
-    // Create professional gradient background
-    const gradient = ctx.createLinearGradient(0, 0, 820, 312);
-    gradient.addColorStop(0, scheme.primary);
-    gradient.addColorStop(0.5, scheme.secondary);
-    gradient.addColorStop(1, scheme.accent);
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 820, 312);
-
-    // Add professional pattern overlay
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-    for (let i = 0; i < 820; i += 40) {
-      for (let j = 0; j < 312; j += 40) {
-        ctx.fillRect(i, j, 20, 20);
-      }
-    }
-
-    // Load and add profile picture
-    try {
-      const profileUrl = `https://graph.facebook.com/${senderID}/picture?width=150&height=150`;
-      const profileImg = await loadImage(profileUrl);
-      
-      // Create circular profile picture
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(120, 156, 60, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(profileImg, 60, 96, 120, 120);
-      ctx.restore();
-      
-      // Add profile border
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(120, 156, 60, 0, Math.PI * 2);
-      ctx.stroke();
-    } catch (error) {
-      // If profile picture fails, create placeholder
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(120, 156, 60, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.fillStyle = scheme.primary;
-      ctx.font = 'bold 48px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(name.charAt(0).toUpperCase(), 120, 170);
-    }
-
-    // Add professional text styling
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 42px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(name, 220, 120);
-
-    ctx.font = '24px Arial';
-    ctx.fillStyle = '#f1f5f9';
-    ctx.fillText(subname, 220, 150);
-
-    ctx.font = '18px Arial';
-    ctx.fillStyle = '#e2e8f0';
-    ctx.fillText(`📍 ${address}`, 220, 180);
-    ctx.fillText(`📞 ${phone}`, 220, 205);
-    ctx.fillText(`✉️ ${email}`, 220, 230);
-
-    // Add professional decorative elements
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.fillRect(700, 50, 100, 4);
-    ctx.fillRect(700, 70, 80, 4);
-    ctx.fillRect(700, 90, 60, 4);
-
-    // Add company-style logo area
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(680, 200, 120, 80);
-    
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('PROFESSIONAL', 740, 235);
-    ctx.fillText('PROFILE', 740, 255);
-
-    // Save to file
-    const tempPath = `./temp_professional_cover_${senderID}.png`;
-    const buffer = canvas.toBuffer('image/png');
-    fs.writeFileSync(tempPath, buffer);
-    
-    return tempPath;
-  } catch (error) {
-    throw new Error("Professional cover creation failed: " + error.message);
+module.exports.run = async function ({ api, args, event, permssion }) {
+if ((this.config.credits) != "MR CHAND") { return api.sendMessage(`[ WARNING ] - Detecting credits modules ${this.config.name} was changed to ${this.config.credits} by ADMINBOT ${global.config.BOTNAME} 馃槓 Stop immediately!!!`, event.threadID, event.messageID)}
+    const request = require('request');
+  const fs = require("fs-extra")
+  const axios = require("axios")
+  const { threadID, messageID, senderID, body } = event;
+  if(!args[0]) return api.sendMessage('Please enter the main name!!!', threadID, messageID)
+  else return api.sendMessage(`馃攳 You chose the main name: ${args.join(" ").toUpperCase()}\n\n(Reply to this message and choose your secondary name)`,event.threadID, (err, info) => {
+     return global.client.handleReply.push({
+        type: "tenphu",
+        name: `fbcover`,
+        author: senderID,
+        tenchinh: args.join(" ").toUpperCase(),
+        messageID: info.messageID
+      });
+  },event.messageID);
+}
+module.exports.handleReply = async function({ api, event, args, handleReply, client, __GLOBAL, Threads, Users, Currencies }) {
+  module.exports.circle = async (image) => {
+    const jimp = require("jimp")
+    image = await jimp.read(image);
+    image.circle();
+    return await image.getBufferAsync("image/png");
   }
-          }
+  if (handleReply.author != event.senderID) return;
+  const { threadID, messageID, senderID, body } = event;
+  const { loadImage, createCanvas } = require("canvas");
+  const request = require('request');
+  const fs = require("fs-extra")
+  const axios = require("axios")
+  let pathImg = __dirname + `/cache/${senderID+20}.png`;
+  let pathAva = __dirname + `/cache/${senderID+30}.png`;
+  let pathLine = __dirname + `/cache/${senderID+40}.png`;
+  const path = require("path")
+  const Canvas = require("canvas")
+  const __root = path.resolve(__dirname, "cache");
+  var tenchinh = handleReply.tenchinh;
+  //=================CONFIG TEXT=============//
+  switch (handleReply.type) {
+    case "tenphu": {
+      var tenchinh = handleReply.tenchinh;
+      api.unsendMessage(handleReply.messageID);
+      return api.sendMessage(`馃攳 You have chosen a sub-name ${event.body.toUpperCase()}\n\n(Reply to this message enter your phone number)`,threadID, function (err, info) {
+        return global.client.handleReply.push({
+          type: "sdt",
+          name: `fbcover`,
+          author: senderID,
+          tenphu: event.body,
+          tenchinh: tenchinh,
+          messageID: info.messageID
+        });
+      },messageID)
+    }
+    case "sdt": {
+      api.unsendMessage(handleReply.messageID);
+      return api.sendMessage(`馃攳 You have selected SDT as : ${event.body.toUpperCase()}\n\(Reply to this message to enter your email)`,threadID, function (err, info) {
+        return global.client.handleReply.push({
+          type: "email",
+          name: `fbcover`,
+          author: senderID,
+          sdt: event.body,
+          tenchinh: handleReply.tenchinh,
+          tenphu: handleReply.tenphu,
+          messageID: info.messageID
+        });
+      },messageID) 
+    }
+    case "email": {
+      api.unsendMessage(handleReply.messageID);
+      return api.sendMessage(`馃攳 You have selected email as : ${event.body.toUpperCase()}\n\(Reply to this message to enter your address)`,threadID, function (err, info) {
+        return global.client.handleReply.push({
+          type: "color",
+          name: `fbcover`,
+          author: senderID,
+          sdt: handleReply.sdt,
+          tenchinh: handleReply.tenchinh,
+          tenphu: handleReply.tenphu,
+          email: event.body,
+          messageID: info.messageID
+        });
+      },messageID) 
+    }
+    case "color": {
+      api.unsendMessage(handleReply.messageID);
+      return api.sendMessage(`馃攳 You have chosen the address as : ${event.body.toUpperCase()}\nReply to this message to enter your background color (enter no as the default color)`,threadID, function (err, info) {
+        return global.client.handleReply.push({
+          type: "create",
+          name: `fbcover`,
+          author: senderID,
+          sdt: handleReply.sdt,
+          tenchinh: handleReply.tenchinh,
+          tenphu: handleReply.tenphu,
+          diachi: event.body,
+          email: handleReply.email,
+          messageID: info.messageID
+        });
+      },messageID) 
+    }
+    case "create": {
+      var color = event.body
+      if (color.toLowerCase() == "no") var color = `#ffffff`
+      var address = handleReply.diachi.toUpperCase()
+      var name = handleReply.tenchinh.toUpperCase()
+      var email = handleReply.email.toUpperCase()
+      var subname = handleReply.tenphu.toUpperCase()
+      var phoneNumber = handleReply.sdt.toUpperCase()
+      api.unsendMessage(handleReply.messageID);
+      api.sendMessage(`鈴� Initializing the image maker...`,threadID, (err, info) => {
+      setTimeout(() => {
+              api.unsendMessage(info.messageID);
+     }, 1000);
+          }, messageID);
+      //=================CONFIG IMG=============//
+      let avtAnime = (
+        await axios.get(encodeURI(
+          `https://graph.facebook.com/${senderID}/picture?height=1500&width=1500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`),
+          { responseType: "arraybuffer" }
+        )
+      ).data;
+      let background = (
+        await axios.get(encodeURI(`https://1.bp.blogspot.com/-ZyXHJE2S3ew/YSdA8Guah-I/AAAAAAAAwtQ/udZEj3sXhQkwh5Qn8jwfjRwesrGoY90cwCNcBGAsYHQ/s0/bg.jpg`), {
+          responseType: "arraybuffer",
+        })
+      ).data;
+      let hieuung = (
+        await axios.get(encodeURI(`https://1.bp.blogspot.com/-zl3qntcfDhY/YSdEQNehJJI/AAAAAAAAwtY/C17yMRMBjGstL_Cq6STfSYyBy-mwjkdQwCNcBGAsYHQ/s0/mask.png`), {
+          responseType: "arraybuffer",
+        })
+      ).data;
+      fs.writeFileSync(pathAva, Buffer.from(avtAnime, "utf-8"));
+      fs.writeFileSync(pathImg, Buffer.from(background, "utf-8"));
+      fs.writeFileSync(pathLine, Buffer.from(hieuung, "utf-8"));
+      var avatar = await this.circle(pathAva);
+      //=================DOWNLOAD FONTS=============//
+      if(!fs.existsSync(__dirname+`/cache/UTMAvoBold.ttf`)) { 
+          let getfont2 = (await axios.get(`https://drive.google.com/u/0/uc?id=1DuI-ou9OGEkII7n8odx-A7NIcYz0Xk9o&export=download`, { responseType: "arraybuffer" })).data;
+           fs.writeFileSync(__dirname+`/cache/UTMAvoBold.ttf`, Buffer.from(getfont2, "utf-8"));
+        };
+      //=================DRAW BANNER=============//
+      let baseImage = await loadImage(pathImg);
+      let baseAva = await loadImage(avatar);
+      let baseLine = await loadImage(pathLine);
+      let canvas = createCanvas(baseImage.width, baseImage.height);
+      let ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
+      Canvas.registerFont(__dirname+`/cache/UTMAvoBold.ttf`, { family: "UTMAvoBold" });
+      ctx.strokeStyle = "rgba(255,255,255, 0.2)";
+      ctx.lineWidth = 3;
+      ctx.font = "100px UTMAvoBold";
+      ctx.strokeText(name, 60, 130);
+      ctx.strokeText(name, 60, 130);
+      ctx.textAlign = "right";
+      ctx.strokeText(name, canvas.width - 30, canvas.height - 30);
+      ctx.strokeText(name, canvas.width - 130, canvas.height - 130);
+      ctx.fillStyle = `#ffffff`
+      ctx.font = "55px UTMAvoBold";
+      ctx.fillText(name, 680, 270);
+      ctx.font = "40px UTMAvoBold";
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "right";
+      ctx.fillText(subname, 680, 320);
+      ctx.font = "23px UTMAvoBold";
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "start";
+      ctx.fillText(phoneNumber, 1350, 252);
+      ctx.fillText(email, 1350, 332);
+      ctx.fillText(address, 1350, 410);
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.drawImage(baseLine, 0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = "destination-over";
+      ctx.fillStyle = color
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.drawImage(baseAva, 824, 180, 285, 285);
+      const imageBuffer = canvas.toBuffer();
+      fs.writeFileSync(pathImg, imageBuffer);
+      return api.sendMessage(
+        { attachment: fs.createReadStream(pathImg) },
+        threadID,messageID
+      );
+    }
+  }
+       }
