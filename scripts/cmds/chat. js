@@ -3,8 +3,8 @@ const axios = require("axios");
 module.exports = {
 	config: {
 		name: "chat",
-		version: "3.0",
-		author: "Human-like AI",
+		version: "3.1",
+		author: "Fixed Version",
 		countDown: 3,
 		role: 0,
 		shortDescription: "Human-like AI Chatbot",
@@ -26,149 +26,126 @@ module.exports = {
 	},
 
 	onStart: async function ({ args, threadsData, message, event, getLang }) {
-		if (args[0] == "on" || args[0] == "off") {
-			await threadsData.set(event.threadID, args[0] == "on", "settings.simsimi");
-			return message.reply(args[0] == "on" ? getLang("turnedOn") : getLang("turnedOff"));
-		} else if (args[0]) {
-			const yourMessage = args.join(" ");
-			try {
+		try {
+			if (args[0] == "on" || args[0] == "off") {
+				await threadsData.set(event.threadID, args[0] == "on", "settings.simsimi");
+				return message.reply(args[0] == "on" ? getLang("turnedOn") : getLang("turnedOff"));
+			} else if (args[0]) {
+				const yourMessage = args.join(" ");
 				const responseMessage = await getHumanLikeResponse(yourMessage);
 				return message.reply(responseMessage);
-			} catch (err) {
-				console.log(err);
-				return message.reply(getLang("error"));
 			}
+		} catch (error) {
+			console.error("Chat onStart error:", error.message);
+			return message.reply(getLang("error"));
 		}
 	},
 
 	onChat: async function ({ args, message, threadsData, event, isUserCallCommand, getLang }) {
-		const messageText = args.join(" ").toLowerCase();
-		const isAutoModeOn = await threadsData.get(event.threadID, "settings.simsimi");
-		
-		// Check if message mentions "bot" or similar keywords
-		const botKeywords = ['bot', 'ai', 'robot', 'chatbot', 'বট', 'রোবট'];
-		const mentionsBot = botKeywords.some(keyword => messageText.includes(keyword));
-		
-		// Respond if: auto mode is on, or bot is mentioned
-		if (!isUserCallCommand && (isAutoModeOn || mentionsBot)) {
-			try {
-				const langCode = (await threadsData.get(event.threadID, "settings.lang")) || global.GoatBot.config.language;
-				const responseMessage = await getHumanLikeResponse(args.join(" "), langCode, mentionsBot);
+		try {
+			// Skip if it's a command call
+			if (isUserCallCommand) return;
+			
+			const messageText = args.join(" ");
+			if (!messageText || messageText.length < 2) return;
+			
+			const lowerMsg = messageText.toLowerCase();
+			const isAutoModeOn = await threadsData.get(event.threadID, "settings.simsimi");
+			
+			// Check if message mentions "bot" keywords
+			const botKeywords = ['bot', 'ai', 'robot', 'chatbot', 'বট', 'রোবট'];
+			const mentionsBot = botKeywords.some(keyword => lowerMsg.includes(keyword));
+			
+			// Only respond if auto mode is on OR bot is mentioned (not both)
+			if (isAutoModeOn || mentionsBot) {
+				const langCode = (await threadsData.get(event.threadID, "settings.lang")) || "en";
+				const responseMessage = await getHumanLikeResponse(messageText, langCode, mentionsBot);
 				
-				// Add human-like delay (1-2 seconds)
-				const delay = Math.random() * 1000 + 500;
-				setTimeout(async () => {
-					return message.reply(responseMessage);
-				}, delay);
-				
-			} catch (err) {
-				return message.reply(getLang("error"));
+				// Add small delay to seem more human
+				setTimeout(() => {
+					message.reply(responseMessage);
+				}, 800);
 			}
+			
+		} catch (error) {
+			console.error("Chat onChat error:", error.message);
+			// Don't reply on onChat errors to avoid spam
 		}
 	},
 };
 
-// Enhanced human-like response function
+// Get human-like response
 async function getHumanLikeResponse(yourMessage, langCode = "en", mentionsBot = false) {
 	try {
-		// Try AI APIs first
-		const response = await tryMultipleAIs(yourMessage, langCode);
-		return humanizeResponse(response, yourMessage);
-		
+		// Try AI API first
+		const aiResponse = await tryAIAPI(yourMessage, langCode);
+		if (aiResponse) {
+			return humanizeResponse(aiResponse);
+		}
 	} catch (error) {
-		// Fallback to contextual responses
-		return getContextualFallback(yourMessage, mentionsBot);
+		// Silent fail, use fallback
 	}
+	
+	// Use contextual fallback
+	return getContextualFallback(yourMessage, mentionsBot);
 }
 
-// Try multiple AI APIs
-async function tryMultipleAIs(message, langCode) {
-	const apis = [
-		// SimSimi API
-		async () => {
-			const res = await axios.post(
-				"https://api.simsimi.vn/v1/simtalk",
-				new URLSearchParams({
-					text: message,
-					lc: langCode || "en",
-				}),
-				{ 
-					timeout: 8000,
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded'
-					}
+// Try AI API with proper error handling
+async function tryAIAPI(message, langCode) {
+	try {
+		const response = await axios.post(
+			"https://api.simsimi.vn/v1/simtalk",
+			new URLSearchParams({
+				text: message,
+				lc: langCode || "en",
+			}),
+			{ 
+				timeout: 5000,
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded'
 				}
-			);
-			return res.data.message;
-		},
-		
-		// Alternative AI API
-		async () => {
-			const res = await axios.get(
-				`https://some-random-api.ml/chatbot?message=${encodeURIComponent(message)}`,
-				{ timeout: 8000 }
-			);
-			return res.data.response;
-		},
-		
-		// PopCat API
-		async () => {
-			const res = await axios.get(
-				`https://api.popcat.xyz/chatbot?msg=${encodeURIComponent(message)}&owner=—͟͟͞͞💜َ𝐀𝐃𝐌𝐈𝐍ン☛𝐑𝐀F𝐈☚&botname=Rafi`,
-				{ timeout: 8000 }
-			);
-			return res.data.response;
-		}
-	];
-	
-	for (const api of apis) {
-		try {
-			const response = await api();
-			if (response && response.length > 0) {
-				return response;
 			}
-		} catch (error) {
-			continue;
+		);
+		
+		if (response.data && response.data.message && response.data.message.length > 0) {
+			return response.data.message;
 		}
+		
+		return null;
+	} catch (error) {
+		return null;
 	}
-	
-	throw new Error("All APIs failed");
 }
 
 // Make response more human-like
-function humanizeResponse(response, originalMessage) {
-	let humanized = response;
+function humanizeResponse(response) {
+	if (!response) return "I'm not sure how to respond to that 🤔";
 	
-	// Add casual expressions randomly
-	const casualStarters = [
-		"", "Well, ", "You know, ", "Actually, ", "Hmm, ", "Oh, ", 
-		"I think ", "Honestly, ", "আসলে, ", "জানো, "
-	];
+	let humanized = response.toString();
 	
-	const casualEnders = [
-		"", " 😊", " 🤔", " 😄", " 👍", " ✨", " 🙂", " 😉"
-	];
+	// Add casual expressions (low chance to avoid spam)
+	const casualStarters = ["Well, ", "You know, ", "Actually, ", "Hmm, "];
+	const casualEnders = [" 😊", " 🤔", " 😄", " 👍"];
 	
-	// Add casual starter (20% chance)
-	if (Math.random() < 0.2) {
+	// 15% chance for casual starter
+	if (Math.random() < 0.15) {
 		const starter = casualStarters[Math.floor(Math.random() * casualStarters.length)];
 		humanized = starter + humanized;
 	}
 	
-	// Add casual ender (30% chance)
-	if (Math.random() < 0.3) {
+	// 20% chance for casual ender
+	if (Math.random() < 0.2) {
 		const ender = casualEnders[Math.floor(Math.random() * casualEnders.length)];
 		humanized = humanized + ender;
 	}
 	
-	// Make contractions more natural
+	// Make contractions
 	humanized = humanized
-		.replace(/\bI am\b/g, "I'm")
-		.replace(/\bdo not\b/g, "don't")
-		.replace(/\bcannot\b/g, "can't")
-		.replace(/\bwill not\b/g, "won't")
-		.replace(/\byou are\b/g, "you're")
-		.replace(/\bit is\b/g, "it's");
+		.replace(/\bI am\b/gi, "I'm")
+		.replace(/\bdo not\b/gi, "don't")
+		.replace(/\bcannot\b/gi, "can't")
+		.replace(/\byou are\b/gi, "you're")
+		.replace(/\bit is\b/gi, "it's");
 	
 	return humanized;
 }
@@ -178,59 +155,54 @@ function getContextualFallback(message, mentionsBot) {
 	const lowerMsg = message.toLowerCase();
 	
 	// Greeting responses
-	if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey') || lowerMsg.includes('হাই') || lowerMsg.includes('হ্যালো')) {
+	if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey') || lowerMsg.includes('হাই')) {
 		const greetings = [
 			"Hey there! How's it going? 😊",
 			"Hi! What's up? 🙂",
-			"Hello! How are you doing? ✨",
-			"হাই! কেমন আছো? 😄",
-			"হ্যালো! কি খবর? 🤗"
+			"Hello! How are you? ✨",
+			"হাই! কেমন আছো? 😄"
 		];
 		return greetings[Math.floor(Math.random() * greetings.length)];
 	}
 	
-	// How are you responses
+	// How are you
 	if (lowerMsg.includes('how are you') || lowerMsg.includes('কেমন আছো')) {
 		const responses = [
 			"I'm doing great! How about you? 😊",
 			"Pretty good! What about you? 🤗",
-			"I'm fantastic! And you? 😄",
 			"ভালো আছি! তুমি কেমন? 😊"
 		];
 		return responses[Math.floor(Math.random() * responses.length)];
 	}
 	
 	// Joke requests
-	if (lowerMsg.includes('joke') || lowerMsg.includes('funny') || lowerMsg.includes('হাসি')) {
+	if (lowerMsg.includes('joke') || lowerMsg.includes('funny')) {
 		const jokes = [
 			"Why don't scientists trust atoms? Because they make up everything! 😄",
-			"I told my computer a joke about UDP... but I'm not sure if it got it! 😂",
-			"Why did the programmer quit his job? He didn't get arrays! 🤓",
-			"কেন কম্পিউটার ঠান্ডা লাগে? কারণ এর Windows খোলা! 😄"
+			"I told my computer a joke... but it didn't laugh! 😂",
+			"Why did the programmer quit? He didn't get arrays! 🤓"
 		];
 		return jokes[Math.floor(Math.random() * jokes.length)];
 	}
 	
-	// Bot mention responses
+	// Bot mentions
 	if (mentionsBot) {
 		const botResponses = [
 			"Yes, I'm here! What's up? 🤖",
 			"You called? I'm listening! 👂",
 			"Hey! What can I help you with? 💭",
-			"হ্যাঁ, আমি এখানে! কি দরকার? 🤖",
-			"Present! What would you like to talk about? 😊"
+			"হ্যাঁ, বলো! কি দরকার? 🤖"
 		];
 		return botResponses[Math.floor(Math.random() * botResponses.length)];
 	}
 	
 	// General responses
 	const generalResponses = [
-		"That's interesting! Tell me more 🤔",
-		"I see! What do you think about that? 💭",
-		"Really? That sounds cool! 😊",
-		"Hmm, that's a good point! 👍",
-		"আহা! এটা দারুণ! 😄",
-		"বুঝলাম! আর কি বলবে? 🤗"
+		"That's interesting! 🤔",
+		"I see what you mean! 💭",
+		"Really? That's cool! 😊",
+		"আহা! দারুণ! 😄",
+		"বুঝলাম! 🤗"
 	];
 	
 	return generalResponses[Math.floor(Math.random() * generalResponses.length)];
