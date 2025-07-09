@@ -4,7 +4,7 @@ module.exports = {
   config: {
     name: "animelogo",
     aliases: ["alogo", "anilogo"],
-    version: "2.0",
+    version: "1.0",
     author: "GoatBot Admin",
     countDown: 8,
     role: 0,
@@ -16,7 +16,7 @@ module.exports = {
     }
   },
 
-  onStart: async function ({ message, args, api, event, getLang }) {
+  onStart: async function ({ message, args, api, event, usersData, threadsData, commandName, getLang }) {
     // Show help if no arguments
     if (args.length === 0) {
       return message.reply(
@@ -104,8 +104,17 @@ module.exports = {
       styleNumber = Math.floor(Math.random() * 10) + 1;
     }
 
+    // Get user data for personalization
+    let userName = "User";
+    try {
+      const userData = await usersData.get(event.senderID);
+      userName = userData.name || "User";
+    } catch (error) {
+      console.log("Could not get user data");
+    }
+
     const processingMsg = await message.reply(
-      `🎨 **Creating Anime Logo**\n\n` +
+      `🎨 **Creating Anime Logo for ${userName}**\n\n` +
       `📝 **Text:** ${text.toUpperCase()}\n` +
       `🎯 **Style:** ${styleNumber}${args[0]?.toLowerCase() === 'random' ? ' (Random)' : ''}\n` +
       `⚡ **Status:** Generating...\n` +
@@ -113,13 +122,13 @@ module.exports = {
     );
 
     try {
-      // API call with enhanced error handling
+      // API call with GoatBot V2 compatible error handling
       const apiUrl = `https://nexalo-api.vercel.app/api/anime-logo-generator?text=${encodeURIComponent(text.toUpperCase())}&number=${styleNumber}`;
       
       const response = await axios.get(apiUrl, {
         timeout: 30000, // 30 seconds timeout
         headers: {
-          'User-Agent': 'GoatBot-AnimeLogoGenerator/2.0',
+          'User-Agent': 'GoatBot-V2-AnimeLogoGenerator/1.0',
           'Accept': 'application/json',
           'Cache-Control': 'no-cache'
         }
@@ -152,6 +161,7 @@ module.exports = {
 
       const successText = 
         `✅ **Anime Logo Created Successfully!**\n\n` +
+        `👤 **For:** ${userName}\n` +
         `📝 **Text:** ${text.toUpperCase()}\n` +
         `🎨 **Style:** ${styleNames[styleNumber] || `Style ${styleNumber}`}\n` +
         `👨‍💻 **API by:** ${data.operator || 'Nexalo'}\n` +
@@ -161,7 +171,7 @@ module.exports = {
         `• Use "animelogo random <text>" for surprise\n` +
         `• Share with friends! 🎉`;
 
-      // Send response with image attachment
+      // Send response with image attachment using GoatBot V2 method
       return message.reply({
         body: successText,
         attachment: await global.utils.getStreamFromURL(data.url)
