@@ -5,7 +5,7 @@ module.exports.config = {
   version: "1.0.0",
   hasPermission: 0,
   credits: "YourName",
-  description: "Send anime memes/gifs from multiple APIs",
+  description: "Send anime memes/gifs, random or by keyword",
   commandCategory: "Anime",
   usages: "animeme [keyword]",
   cooldowns: 5,
@@ -47,11 +47,15 @@ async function getWaifuPic(type = "waifu") {
   }
 }
 
-// Acceptable Anime GIFs API থেকে র্যান্ডম gif আনার ফাংশন
+// Acceptable Anime GIFs API থেকে র‍্যান্ডম gif আনার ফাংশন
 async function getAcceptableAnimeGif() {
   try {
-    const res = await axios.get("https://acceptable-anime-gifs-api.loca.lt/random/gif");
-    if (res.data && res.data.url) return { url: res.data.url, title: "Acceptable Anime GIF" };
+    // https://acceptable-anime-gifs-api.ltl.workers.dev/random/gif
+    const res = await axios.get("https://acceptable-anime-gifs-api.ltl.workers.dev/random/gif", { maxRedirects: 0, validateStatus: null });
+    // এই API রিডাইরেক্ট করে সরাসরি gif URL দেয় Location হেডারে
+    if (res.status === 302 && res.headers.location) {
+      return { url: res.headers.location, title: "Acceptable Anime Gif" };
+    }
     return null;
   } catch {
     return null;
@@ -61,7 +65,7 @@ async function getAcceptableAnimeGif() {
 module.exports.run = async function({ api, event, args }) {
   const keyword = args[0] ? args[0].toLowerCase() : "";
 
-  // ১. যদি keyword থাকে, Reddit সাবরেডিট হিসেবে চেষ্টা করুন
+  // যদি keyword থাকে, Reddit সাবরেডিট হিসেবে চেষ্টা করুন
   if (keyword) {
     const meme = await getRedditMeme(keyword);
     if (meme) {
@@ -69,19 +73,19 @@ module.exports.run = async function({ api, event, args }) {
     }
   }
 
-  // ২. OtakuGifs থেকে র্যান্ডম anime meme gif দিন
+  // না হলে OtakuGifs থেকে র্যান্ডম anime meme gif দিন
   const otakuGif = await getOtakuGif("anime-meme");
   if (otakuGif) {
     return api.sendMessage({ body: otakuGif.title, attachment: await global.utils.getStreamFromURL(otakuGif.url) }, event.threadID, event.messageID);
   }
 
-  // ৩. Waifu.pics থেকে Waifu ছবি দিন
+  // Waifu.pics থেকে Waifu ছবি দিন (অপশনাল)
   const waifu = await getWaifuPic("waifu");
   if (waifu) {
     return api.sendMessage({ body: waifu.title, attachment: await global.utils.getStreamFromURL(waifu.url) }, event.threadID, event.messageID);
   }
 
-  // ৪. Acceptable Anime GIFs API থেকে র্যান্ডম gif দিন
+  // Acceptable Anime GIFs API থেকে র‍্যান্ডম gif দিন
   const acceptableGif = await getAcceptableAnimeGif();
   if (acceptableGif) {
     return api.sendMessage({ body: acceptableGif.title, attachment: await global.utils.getStreamFromURL(acceptableGif.url) }, event.threadID, event.messageID);
@@ -89,3 +93,4 @@ module.exports.run = async function({ api, event, args }) {
 
   return api.sendMessage("❌ Sorry, couldn't find any meme or gif for your request.", event.threadID, event.messageID);
 };
+                                          
