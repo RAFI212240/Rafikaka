@@ -7,6 +7,11 @@ module.exports = {
     author: "Zed",
     countDown: 3,
     category: "media",
+    shortDescription: "Send random Hana images",
+    longDescription: "Send random Hana images from a predefined list",
+    guide: {
+      en: "{pn}"
+    }
   },
 
   langs: {
@@ -15,16 +20,25 @@ module.exports = {
   },
 
   onStart: async function ({ message }) {
-    var link = [
-      "https://i.imgur.com/G6H2YUr.jpg",
-      "https://i.postimg.cc/zfwWtCL4/00fc1e86.jpg",
-      // ... বাকি লিংকগুলো ...
-      "https://i.postimg.cc/yYvSZ6qC/photo1629105601-5.jpg",
-    ];
-    let img = link[Math.floor(Math.random() * link.length)];
-    return message.reply({
-      body: '「 Hana OwO 」',
-      attachment: await global.utils.getStreamFromURL(img)
-    });
+    try {
+      const links = [
+        "https://i.imgur.com/G6H2YUr.jpg",
+        "https://i.postimg.cc/zfwWtCL4/00fc1e86.jpg",
+        "https://i.postimg.cc/mDCbNjtF/02370b89.jpg",
+        // ... আপনার বাকি লিংকগুলো এখানে রাখুন ...
+        "https://i.postimg.cc/yYvSZ6qC/photo1629105601-5.jpg"
+      ];
+
+      const img = links[Math.floor(Math.random() * links.length)];
+      const attachment = await global.utils.getStreamFromURL(img);
+
+      return message.reply({
+        body: "「 Hana OwO 」",
+        attachment: attachment
+      });
+    } catch (error) {
+      console.error("Error in hana command:", error);
+      return message.reply("❌ Sorry, something went wrong!");
+    }
   }
 };
