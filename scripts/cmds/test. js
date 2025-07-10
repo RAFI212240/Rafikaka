@@ -5,24 +5,23 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// ====== CONFIG ZONE ======
 const YTDL_PRIMARY_API = 'https://sus-apis.onrender.com/api/ytdlv3';
 const YTDL_FALLBACK_API = 'http://localhost:4000/api/ytdl-v4';
-// ==========================
 
 module.exports = {
-    name: "ytdl",
-    version: "120.0",
-    author: "Hridoy",
-    description: "Download a YouTube video and send it to the user 📹",
-    adminOnly: false,
-    commandCategory: "Media",
-    guide: "Use {pn}ytdl <video_url> to download a YouTube video.\n" +
-           "Example: {pn}ytdl https://www.youtube.com/watch?v=aUut5qQECc4",
-    cooldowns: 10,
-    usePrefix: true,
+    config: {
+        name: "ytdl",
+        version: "1.2.0",
+        author: "Hridoy",
+        description: "Download a YouTube video and send it to the user 📹",
+        adminOnly: false,
+        commandCategory: "Media",
+        guide: "Use {pn}ytdl <video_url> to download a YouTube video.\nExample: {pn}ytdl https://www.youtube.com/watch?v=aUut5qQECc4",
+        cooldowns: 10,
+        usePrefix: true,
+    },
 
-    async execute({ api, event, args }) {
+    onStart: async function ({ api, event, args }) {
         const threadID = event.threadID;
         const messageID = event.messageID;
         const senderID = event.senderID;
@@ -33,14 +32,14 @@ module.exports = {
         try {
             if (!event || !threadID || !messageID) {
                 logger.error("Invalid event object in ytdl command", { event });
-                return api.sendMessage(`${config.bot.botName}: ❌ Invalid event data.`, threadID);
+                return api.sendMessage(`${config.bot.nickNameBot}: ❌ Invalid event data.`, threadID);
             }
 
             if (!args[0]) {
                 logger.warn("No video URL provided in ytdl command");
                 api.setMessageReaction("❌", messageID, () => {}, true);
                 return api.sendMessage(
-                    `${config.bot.botName}: ❌ Please provide a YouTube video URL. Example: {pn}ytdl <video_url>`,
+                    `${config.bot.nickNameBot}: ❌ Please provide a YouTube video URL. Example: ${config.prefix}ytdl <video_url>`,
                     threadID,
                     messageID
                 );
@@ -51,7 +50,7 @@ module.exports = {
                 logger.warn(`Invalid YouTube video URL provided: ${videoUrl}`);
                 api.setMessageReaction("❌", messageID, () => {}, true);
                 return api.sendMessage(
-                    `${config.bot.botName}: ❌ Please provide a valid YouTube video URL.`,
+                    `${config.bot.nickNameBot}: ❌ Please provide a valid YouTube video URL.`,
                     threadID,
                     messageID
                 );
@@ -59,13 +58,15 @@ module.exports = {
 
             logger.info(`Downloading YouTube video for URL: ${videoUrl} in thread ${threadID}`);
 
+            // Send searching message and save messageID for editing later
             progressMsgID = await new Promise((resolve) => {
-                api.sendMessage(`${config.bot.botName}: 🔍 Searching...`, threadID, (err, info) => {
+                api.sendMessage(`${config.bot.nickNameBot}: 🔍 Searching...`, threadID, (err, info) => {
                     if (err) resolve(null);
                     else resolve(info.messageID);
                 });
             });
 
+            // Try primary API first
             let videoDownloadUrl, usedApi, videoTitle;
             try {
                 const apiUrl = `${YTDL_PRIMARY_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
@@ -81,7 +82,7 @@ module.exports = {
                 }
             } catch (primaryErr) {
                 logger.warn(`Primary API failed (${primaryErr.message}), falling back to local API`);
-             
+
                 const fallbackApiUrl = `${YTDL_FALLBACK_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
                 logger.info(`Trying fallback MP4 API: ${fallbackApiUrl}`);
 
@@ -99,9 +100,10 @@ module.exports = {
             logger.info(`Video download URL: ${videoDownloadUrl} (via ${usedApi} API)`);
 
             if (progressMsgID) {
-                await api.editMessage(`${config.bot.botName}: 📥 Downloading...`, progressMsgID, threadID);
+                await api.editMessage(`${config.bot.nickNameBot}: 📥 Downloading...`, progressMsgID, threadID);
             }
 
+            // Prepare temp directory and file path
             const tempDir = path.join(__dirname, '..', '..', 'temp');
             if (!fs.existsSync(tempDir)) {
                 fs.mkdirSync(tempDir, { recursive: true });
@@ -109,6 +111,7 @@ module.exports = {
             const fileName = `ytdl_${crypto.randomBytes(8).toString('hex')}.mp4`;
             filePath = path.join(tempDir, fileName);
 
+            // Download video stream
             const videoResponse = await axios.get(videoDownloadUrl, {
                 responseType: 'stream',
                 timeout: 60000
@@ -131,9 +134,10 @@ module.exports = {
             if (stats.size === 0) throw new Error("Downloaded video file is empty");
 
             if (progressMsgID) {
-                await api.editMessage(`${config.bot.botName}: 📤 Sending...`, progressMsgID, threadID);
+                await api.editMessage(`${config.bot.nickNameBot}: 📤 Sending...`, progressMsgID, threadID);
             }
 
+            // Get sender info for logging
             const senderInfo = await new Promise((resolve, reject) => {
                 api.getUserInfo([senderID], (err, info) => {
                     if (err) reject(err);
@@ -142,12 +146,14 @@ module.exports = {
             });
             const senderName = senderInfo[senderID]?.name || "Unknown User";
 
+            // Prepare message with attachment
             const msg = {
-                body: `${config.bot.botName}: 📹 ${videoTitle}`,
+                body: `${config.bot.nickNameBot}: 📹 ${videoTitle}`,
                 attachment: fs.createReadStream(filePath)
             };
 
             logger.info(`Sending video "${videoTitle}" to ${senderName} in thread ${threadID}`);
+
             await new Promise((resolve, reject) => {
                 api.sendMessage(msg, threadID, async (err) => {
                     if (err) return reject(err);
@@ -159,10 +165,13 @@ module.exports = {
                     resolve();
                 }, messageID);
             });
+
             logger.info("Video sent successfully");
 
+            // Clean up temp file
             fs.unlinkSync(filePath);
             logger.info(`[YTDL Command] Sent video "${videoTitle}" to ${senderName}`);
+
         } catch (err) {
             logger.error(`Error in ytdl command: ${err.message}`, { stack: err.stack });
 
@@ -170,13 +179,13 @@ module.exports = {
 
             if (progressMsgID) {
                 await api.editMessage(
-                    `${config.bot.botName}: ⚠️ Error: ${err.message}`,
+                    `${config.bot.nickNameBot}: ⚠️ Error: ${err.message}`,
                     progressMsgID,
                     threadID
                 );
             } else {
                 await api.sendMessage(
-                    `${config.bot.botName}: ⚠️ Error: ${err.message}`,
+                    `${config.bot.nickNameBot}: ⚠️ Error: ${err.message}`,
                     threadID,
                     messageID
                 );
