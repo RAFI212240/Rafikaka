@@ -1,5 +1,3 @@
-const config = require('../../config/config.json');
-const logger = require('../../includes/logger');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -9,191 +7,95 @@ const YTDL_PRIMARY_API = 'https://sus-apis.onrender.com/api/ytdlv3';
 const YTDL_FALLBACK_API = 'http://localhost:4000/api/ytdl-v4';
 
 module.exports = {
-    config: {
-        name: "ytdl",
-        version: "1.2.0",
-        author: "Hridoy",
-        description: "Download a YouTube video and send it to the user 📹",
-        adminOnly: false,
-        commandCategory: "Media",
-        guide: "Use {pn}ytdl <video_url> to download a YouTube video.\nExample: {pn}ytdl https://www.youtube.com/watch?v=aUut5qQECc4",
-        cooldowns: 10,
-        usePrefix: true,
-    },
+  name: "ytdl",
+  description: "Download a YouTube video and send it to the user 📹",
+  usage: "!ytdl <YouTube URL>",
+  cooldown: 10,
+  adminOnly: false,
 
-    onStart: async function ({ api, event, args }) {
-        const threadID = event.threadID;
-        const messageID = event.messageID;
-        const senderID = event.senderID;
+  /**
+   * 
+   * @param {object} botApi - বটের API অবজেক্ট, যেটা মেসেজ পাঠানো, রিসিভ করার ফাংশন রাখে
+   * @param {object} event - ইভেন্ট অবজেক্ট, যেখানে মেসেজ, ইউজার, চ্যানেল/থ্রেড আইডি থাকে
+   * @param {array} args - কমান্ডের আর্গুমেন্টস (যেমন ইউটিউব ভিডিও URL)
+   */
+  async execute(botApi, event, args) {
+    const threadID = event.threadID || event.chatID || event.channelID;
+    const messageID = event.messageID || event.id;
+    const senderID = event.senderID || event.author;
 
-        let filePath;
-        let progressMsgID = null;
+    let filePath;
+    let progressMsgID = null;
 
-        try {
-            if (!event || !threadID || !messageID) {
-                logger.error("Invalid event object in ytdl command", { event });
-                return api.sendMessage(`${config.bot.nickNameBot}: ❌ Invalid event data.`, threadID);
-            }
+    try {
+      if (!args[0]) {
+        return botApi.sendMessage(`❌ Please provide a YouTube video URL.\nUsage: ${this.usage}`, threadID, messageID);
+      }
 
-            if (!args[0]) {
-                logger.warn("No video URL provided in ytdl command");
-                api.setMessageReaction("❌", messageID, () => {}, true);
-                return api.sendMessage(
-                    `${config.bot.nickNameBot}: ❌ Please provide a YouTube video URL. Example: ${config.prefix}ytdl <video_url>`,
-                    threadID,
-                    messageID
-                );
-            }
+      const videoUrl = args[0].trim();
+      if (!videoUrl.startsWith('https://') || (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be'))) {
+        return botApi.sendMessage(`❌ Please provide a valid YouTube video URL.`, threadID, messageID);
+      }
 
-            const videoUrl = args[0].trim();
-            if (!videoUrl.startsWith('https://') || (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be'))) {
-                logger.warn(`Invalid YouTube video URL provided: ${videoUrl}`);
-                api.setMessageReaction("❌", messageID, () => {}, true);
-                return api.sendMessage(
-                    `${config.bot.nickNameBot}: ❌ Please provide a valid YouTube video URL.`,
-                    threadID,
-                    messageID
-                );
-            }
+      // Send searching message
+      progressMsgID = await botApi.sendMessage(`🔍 Searching for video...`, threadID);
 
-            logger.info(`Downloading YouTube video for URL: ${videoUrl} in thread ${threadID}`);
+      // Try primary API
+      let videoDownloadUrl, videoTitle;
+      try {
+        const apiUrl = `${YTDL_PRIMARY_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
+        const primaryResponse = await axios.get(apiUrl, { timeout: 20000 });
 
-            // Send searching message and save messageID for editing later
-            progressMsgID = await new Promise((resolve) => {
-                api.sendMessage(`${config.bot.nickNameBot}: 🔍 Searching...`, threadID, (err, info) => {
-                    if (err) resolve(null);
-                    else resolve(info.messageID);
-                });
-            });
-
-            // Try primary API first
-            let videoDownloadUrl, usedApi, videoTitle;
-            try {
-                const apiUrl = `${YTDL_PRIMARY_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
-                logger.info(`Trying primary MP4 API: ${apiUrl}`);
-                const primaryResponse = await axios.get(apiUrl, { timeout: 20000 });
-
-                if (primaryResponse.data && primaryResponse.data.success && primaryResponse.data.data && primaryResponse.data.data.downloadUrl) {
-                    videoDownloadUrl = primaryResponse.data.data.downloadUrl;
-                    videoTitle = primaryResponse.data.data.title || "YouTube Video";
-                    usedApi = 'primary';
-                } else {
-                    throw new Error("Primary API did not return a valid MP4 URL");
-                }
-            } catch (primaryErr) {
-                logger.warn(`Primary API failed (${primaryErr.message}), falling back to local API`);
-
-                const fallbackApiUrl = `${YTDL_FALLBACK_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
-                logger.info(`Trying fallback MP4 API: ${fallbackApiUrl}`);
-
-                const fallbackResponse = await axios.get(fallbackApiUrl, { timeout: 20000 });
-
-                if (fallbackResponse.data && fallbackResponse.data.success && fallbackResponse.data.downloadUrl) {
-                    videoDownloadUrl = fallbackResponse.data.downloadUrl;
-                    videoTitle = fallbackResponse.data.title || "YouTube Video";
-                    usedApi = 'fallback';
-                } else {
-                    throw new Error("Fallback API did not return a valid MP4 URL");
-                }
-            }
-
-            logger.info(`Video download URL: ${videoDownloadUrl} (via ${usedApi} API)`);
-
-            if (progressMsgID) {
-                await api.editMessage(`${config.bot.nickNameBot}: 📥 Downloading...`, progressMsgID, threadID);
-            }
-
-            // Prepare temp directory and file path
-            const tempDir = path.join(__dirname, '..', '..', 'temp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
-            const fileName = `ytdl_${crypto.randomBytes(8).toString('hex')}.mp4`;
-            filePath = path.join(tempDir, fileName);
-
-            // Download video stream
-            const videoResponse = await axios.get(videoDownloadUrl, {
-                responseType: 'stream',
-                timeout: 60000
-            });
-
-            const contentType = videoResponse.headers['content-type'];
-            if (!contentType || (!contentType.startsWith('video/') && contentType !== 'application/octet-stream')) {
-                throw new Error(`API response has unexpected Content-Type: ${contentType}`);
-            }
-
-            const writer = fs.createWriteStream(filePath);
-            videoResponse.data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
-                writer.on('error', reject);
-            });
-
-            const stats = fs.statSync(filePath);
-            if (stats.size === 0) throw new Error("Downloaded video file is empty");
-
-            if (progressMsgID) {
-                await api.editMessage(`${config.bot.nickNameBot}: 📤 Sending...`, progressMsgID, threadID);
-            }
-
-            // Get sender info for logging
-            const senderInfo = await new Promise((resolve, reject) => {
-                api.getUserInfo([senderID], (err, info) => {
-                    if (err) reject(err);
-                    else resolve(info);
-                });
-            });
-            const senderName = senderInfo[senderID]?.name || "Unknown User";
-
-            // Prepare message with attachment
-            const msg = {
-                body: `${config.bot.nickNameBot}: 📹 ${videoTitle}`,
-                attachment: fs.createReadStream(filePath)
-            };
-
-            logger.info(`Sending video "${videoTitle}" to ${senderName} in thread ${threadID}`);
-
-            await new Promise((resolve, reject) => {
-                api.sendMessage(msg, threadID, async (err) => {
-                    if (err) return reject(err);
-                    api.setMessageReaction("📹", messageID, () => {}, true);
-
-                    if (progressMsgID) {
-                        await api.unsendMessage(progressMsgID);
-                    }
-                    resolve();
-                }, messageID);
-            });
-
-            logger.info("Video sent successfully");
-
-            // Clean up temp file
-            fs.unlinkSync(filePath);
-            logger.info(`[YTDL Command] Sent video "${videoTitle}" to ${senderName}`);
-
-        } catch (err) {
-            logger.error(`Error in ytdl command: ${err.message}`, { stack: err.stack });
-
-            api.setMessageReaction("❌", messageID, () => {}, true);
-
-            if (progressMsgID) {
-                await api.editMessage(
-                    `${config.bot.nickNameBot}: ⚠️ Error: ${err.message}`,
-                    progressMsgID,
-                    threadID
-                );
-            } else {
-                await api.sendMessage(
-                    `${config.bot.nickNameBot}: ⚠️ Error: ${err.message}`,
-                    threadID,
-                    messageID
-                );
-            }
-
-            if (filePath && fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+        if (primaryResponse.data && primaryResponse.data.success && primaryResponse.data.data && primaryResponse.data.data.downloadUrl) {
+          videoDownloadUrl = primaryResponse.data.data.downloadUrl;
+          videoTitle = primaryResponse.data.data.title || "YouTube Video";
+        } else {
+          throw new Error("Primary API did not return a valid MP4 URL");
         }
-    }
-};
+      } catch (err) {
+        // Fallback API
+        const fallbackApiUrl = `${YTDL_FALLBACK_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
+        const fallbackResponse = await axios.get(fallbackApiUrl, { timeout: 20000 });
+
+        if (fallbackResponse.data && fallbackResponse.data.success && fallbackResponse.data.downloadUrl) {
+          videoDownloadUrl = fallbackResponse.data.downloadUrl;
+          videoTitle = fallbackResponse.data.title || "YouTube Video";
+        } else {
+          throw new Error("Fallback API did not return a valid MP4 URL");
+        }
+      }
+
+      // Edit progress message
+      if (progressMsgID) {
+        await botApi.editMessage && botApi.editMessage(`📥 Downloading video...`, progressMsgID, threadID);
+      }
+
+      // Prepare temp file path
+      const tempDir = path.join(__dirname, '..', 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      const fileName = `ytdl_${crypto.randomBytes(8).toString('hex')}.mp4`;
+      filePath = path.join(tempDir, fileName);
+
+      // Download video stream
+      const videoResponse = await axios.get(videoDownloadUrl, {
+        responseType: 'stream',
+        timeout: 60000
+      });
+
+      const contentType = videoResponse.headers['content-type'];
+      if (!contentType || (!contentType.startsWith('video/') && contentType !== 'application/octet-stream')) {
+        throw new Error(`Unexpected Content-Type: ${contentType}`);
+      }
+
+      const writer = fs.createWriteStream(filePath);
+      videoResponse.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+
+      const stats = fs.statSync(filePath);
+      if (stats.size === 0) throw new Error("Downloaded video file is empty");
+
+      // Edit progress message again
