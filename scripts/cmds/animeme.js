@@ -1,5 +1,3 @@
-const axios = require("axios");
-
 module.exports.config = {
   name: "animeme",
   version: "1.0.0",
@@ -12,7 +10,8 @@ module.exports.config = {
   dependencies: ["axios"]
 };
 
-// Reddit থেকে meme আনার ফাংশন
+const axios = require("axios");
+
 async function getRedditMeme(subreddit = "animemes") {
   try {
     const res = await axios.get(`https://www.reddit.com/r/${subreddit}/hot.json?limit=50`);
@@ -25,61 +24,19 @@ async function getRedditMeme(subreddit = "animemes") {
   }
 }
 
-// OtakuGifs থেকে gif আনার ফাংশন
-async function getOtakuGif(reaction = "anime-meme") {
-  try {
-    const res = await axios.get(`https://api.otakugifs.xyz/gif?reaction=${reaction}`);
-    if (res.data && res.data.url) return { url: res.data.url, title: `Anime Gif: ${reaction}` };
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// Waifu.pics থেকে নির্দিষ্ট ছবি রিটার্ন করার ফাংশন
-async function getFixedWaifuPic() {
-  // আপনার চাওয়া ছবি URL সরাসরি রিটার্ন করলাম
-  return {
-    url: "https://i.waifu.pics/qUY7BBo.jpg",
-    title: "Fixed Waifu Pic"
-  };
-}
-
 module.exports.run = async function({ api, event, args }) {
   const keyword = args[0] ? args[0].toLowerCase() : "";
+  let meme = null;
 
-  // যদি keyword থাকে, Reddit সাবরেডিট হিসেবে চেষ্টা করুন
-  if (keyword) {
-    const meme = await getRedditMeme(keyword);
-    if (meme) {
-      return api.sendMessage(
-        { body: meme.title, attachment: await global.utils.getStreamFromURL(meme.url) },
-        event.threadID,
-        event.messageID
-      );
-    }
-  }
+  if (keyword) meme = await getRedditMeme(keyword);
+  if (!meme) meme = await getRedditMeme();
 
-  // না হলে OtakuGifs থেকে র্যান্ডম anime meme gif দিন
-  const gif = await getOtakuGif("anime-meme");
-  if (gif) {
-    return api.sendMessage(
-      { body: gif.title, attachment: await global.utils.getStreamFromURL(gif.url) },
-      event.threadID,
-      event.messageID
-    );
-  }
+  if (!meme) return api.sendMessage("❌ Couldn't find any meme.", event.threadID, event.messageID);
 
-  // OtakuGifs কাজ না করলে Waifu.pics থেকে নির্দিষ্ট ছবি দিন
-  const waifu = await getFixedWaifuPic();
-  if (waifu) {
-    return api.sendMessage(
-      { body: waifu.title, attachment: await global.utils.getStreamFromURL(waifu.url) },
-      event.threadID,
-      event.messageID
-    );
-  }
-
-  return api.sendMessage("❌ Sorry, couldn't find any meme for your request.", event.threadID, event.messageID);
+  return api.sendMessage(
+    { body: meme.title, attachment: await global.utils.getStreamFromURL(meme.url) },
+    event.threadID,
+    event.messageID
+  );
 };
-    
+  
