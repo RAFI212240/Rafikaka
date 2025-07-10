@@ -25,7 +25,7 @@ module.exports = {
         "https://i.imgur.com/G6H2YUr.jpg",
         "https://i.postimg.cc/zfwWtCL4/00fc1e86.jpg",
         "https://i.postimg.cc/mDCbNjtF/02370b89.jpg",
-        // ... আপনার বাকি লিংকগুলো এখানে রাখুন ...
+        // এখানে আপনার বাকি লিংকগুলো রাখুন
         "https://i.postimg.cc/yYvSZ6qC/photo1629105601-5.jpg"
       ];
 
