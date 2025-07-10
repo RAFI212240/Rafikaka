@@ -1,42 +1,67 @@
-module.exports.config = {
-  name: "animeme",
-  version: "1.0.0",
-  hasPermission: 0,
-  credits: "YourName",
-  description: "Send anime memes/gifs, random or by keyword",
-  commandCategory: "Anime",
-  usages: "animeme [keyword]",
-  cooldowns: 5,
-  dependencies: ["axios"]
-};
-
 const axios = require("axios");
 
-async function getRedditMeme(subreddit = "animemes") {
-  try {
-    const res = await axios.get(`https://www.reddit.com/r/${subreddit}/hot.json?limit=50`);
-    const posts = res.data.data.children.filter(post => !post.data.over_18 && post.data.post_hint === "image");
-    if (!posts.length) return null;
-    const randomPost = posts[Math.floor(Math.random() * posts.length)].data;
-    return { url: randomPost.url, title: randomPost.title };
-  } catch {
-    return null;
-  }
-}
+module.exports = {
+  config: {
+    name: "animeme",
+    version: "1.0.0",
+    author: "YourName",
+    countDown: 5,
+    role: 0,
+    shortDescription: "Send anime memes/gifs, random or by keyword",
+    longDescription: "Get anime memes from Reddit, OtakuGifs, or Waifu.pics",
+    category: "anime",
+    guide: {
+      en: "{pn} [keyword]"
+    }
+  },
 
-module.exports.run = async function({ api, event, args }) {
-  const keyword = args[0] ? args[0].toLowerCase() : "";
-  let meme = null;
+  // Reddit থেকে meme আনার ফাংশন
+  async getRedditMeme(subreddit = "animemes") {
+    try {
+      const res = await axios.get(`https://www.reddit.com/r/${subreddit}/hot.json?limit=50`);
+      const posts = res.data.data.children.filter(post => 
+        !post.data.over_18 && 
+        post.data.post_hint === "image"
+      );
+      if (!posts.length) return null;
+      
+      const randomPost = posts[Math.floor(Math.random() * posts.length)].data;
+      return { 
+        url: randomPost.url, 
+        title: randomPost.title 
+      };
+    } catch {
+      return null;
+    }
+  },
 
-  if (keyword) meme = await getRedditMeme(keyword);
-  if (!meme) meme = await getRedditMeme();
+  // OtakuGifs থেকে gif আনার ফাংশন
+  async getOtakuGif(reaction = "anime-meme") {
+    try {
+      const res = await axios.get(`https://api.otakugifs.xyz/gif?reaction=${reaction}`);
+      if (res.data && res.data.url) {
+        return { 
+          url: res.data.url, 
+          title: `Anime Gif: ${reaction}` 
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
 
-  if (!meme) return api.sendMessage("❌ Couldn't find any meme.", event.threadID, event.messageID);
+  // Waifu.pics থেকে নির্দিষ্ট ছবি রিটার্ন করার ফাংশন
+  async getFixedWaifuPic() {
+    return {
+      url: "https://i.waifu.pics/qUY7BBo.jpg",
+      title: "Fixed Waifu Pic"
+    };
+  },
 
-  return api.sendMessage(
-    { body: meme.title, attachment: await global.utils.getStreamFromURL(meme.url) },
-    event.threadID,
-    event.messageID
-  );
-};
-  
+  onStart: async function({ message, args, api, event }) {
+    const keyword = args[0] ? args[0].toLowerCase() : "";
+
+    try {
+      // যদি keyword থাকে, Reddit সাবরে
+      
