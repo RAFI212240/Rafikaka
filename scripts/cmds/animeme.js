@@ -36,30 +36,13 @@ async function getOtakuGif(reaction = "anime-meme") {
   }
 }
 
-// Waifu.pics থেকে ছবি আনার ফাংশন
-async function getWaifuPic(type = "waifu") {
-  try {
-    const res = await axios.get(`https://api.waifu.pics/sfw/${type}`);
-    if (res.data && res.data.url) return { url: res.data.url, title: `Waifu Pic: ${type}` };
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// Acceptable Anime GIFs API থেকে র‍্যান্ডম gif আনার ফাংশন
-async function getAcceptableAnimeGif() {
-  try {
-    // https://acceptable-anime-gifs-api.ltl.workers.dev/random/gif
-    const res = await axios.get("https://acceptable-anime-gifs-api.ltl.workers.dev/random/gif", { maxRedirects: 0, validateStatus: null });
-    // এই API রিডাইরেক্ট করে সরাসরি gif URL দেয় Location হেডারে
-    if (res.status === 302 && res.headers.location) {
-      return { url: res.headers.location, title: "Acceptable Anime Gif" };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+// Waifu.pics থেকে নির্দিষ্ট ছবি রিটার্ন করার ফাংশন
+async function getFixedWaifuPic() {
+  // আপনার চাওয়া ছবি URL সরাসরি রিটার্ন করলাম
+  return {
+    url: "https://i.waifu.pics/qUY7BBo.jpg",
+    title: "Fixed Waifu Pic"
+  };
 }
 
 module.exports.run = async function({ api, event, args }) {
@@ -69,28 +52,34 @@ module.exports.run = async function({ api, event, args }) {
   if (keyword) {
     const meme = await getRedditMeme(keyword);
     if (meme) {
-      return api.sendMessage({ body: meme.title, attachment: await global.utils.getStreamFromURL(meme.url) }, event.threadID, event.messageID);
+      return api.sendMessage(
+        { body: meme.title, attachment: await global.utils.getStreamFromURL(meme.url) },
+        event.threadID,
+        event.messageID
+      );
     }
   }
 
   // না হলে OtakuGifs থেকে র্যান্ডম anime meme gif দিন
-  const otakuGif = await getOtakuGif("anime-meme");
-  if (otakuGif) {
-    return api.sendMessage({ body: otakuGif.title, attachment: await global.utils.getStreamFromURL(otakuGif.url) }, event.threadID, event.messageID);
+  const gif = await getOtakuGif("anime-meme");
+  if (gif) {
+    return api.sendMessage(
+      { body: gif.title, attachment: await global.utils.getStreamFromURL(gif.url) },
+      event.threadID,
+      event.messageID
+    );
   }
 
-  // Waifu.pics থেকে Waifu ছবি দিন (অপশনাল)
-  const waifu = await getWaifuPic("waifu");
+  // OtakuGifs কাজ না করলে Waifu.pics থেকে নির্দিষ্ট ছবি দিন
+  const waifu = await getFixedWaifuPic();
   if (waifu) {
-    return api.sendMessage({ body: waifu.title, attachment: await global.utils.getStreamFromURL(waifu.url) }, event.threadID, event.messageID);
+    return api.sendMessage(
+      { body: waifu.title, attachment: await global.utils.getStreamFromURL(waifu.url) },
+      event.threadID,
+      event.messageID
+    );
   }
 
-  // Acceptable Anime GIFs API থেকে র‍্যান্ডম gif দিন
-  const acceptableGif = await getAcceptableAnimeGif();
-  if (acceptableGif) {
-    return api.sendMessage({ body: acceptableGif.title, attachment: await global.utils.getStreamFromURL(acceptableGif.url) }, event.threadID, event.messageID);
-  }
-
-  return api.sendMessage("❌ Sorry, couldn't find any meme or gif for your request.", event.threadID, event.messageID);
+  return api.sendMessage("❌ Sorry, couldn't find any meme for your request.", event.threadID, event.messageID);
 };
-                                          
+    
