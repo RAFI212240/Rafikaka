@@ -1,33 +1,37 @@
-const fs = require("fs");
+const fs = require("fs-extra");
 const axios = require("axios");
+const path = require("path");
 
 module.exports.config = {
   name: "groupimage",
   version: "1.0.0",
   hasPermission: 0,
   credits: "𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️",
-  description: "Change your group image",
+  description: "Change your group image by replying to a photo",
   commandCategory: "Box",
   usages: "groupimage",
   cooldowns: 0,
-  dependencies: ["axios"]
+  dependencies: ["axios", "fs-extra"]
 };
 
-module.exports.run = async ({ api, event }) => {
+module.exports.run = async function({ api, event }) {
   if (event.type !== "message_reply") 
-    return api.sendMessage("❌ You have to reply to a photo", event.threadID, event.messageID);
+    return api.sendMessage("❌ You have to reply to a photo!", event.threadID, event.messageID);
 
   if (!event.messageReply.attachments || event.messageReply.attachments.length === 0) 
-    return api.sendMessage("❌ You have to reply to a photo", event.threadID, event.messageID);
+    return api.sendMessage("❌ You have to reply to a photo!", event.threadID, event.messageID);
 
   if (event.messageReply.attachments.length > 1) 
-    return api.sendMessage("Please reply only 1 photo!", event.threadID, event.messageID);
+    return api.sendMessage("❌ Please reply only 1 photo!", event.threadID, event.messageID);
 
   try {
     const imageUrl = event.messageReply.attachments[0].url;
-    const pathImg = __dirname + "/cache/groupimage.png";
+    const cacheDir = path.join(__dirname, "cache");
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
+
+    const pathImg = path.join(cacheDir, "groupimage.png");
     const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-    fs.writeFileSync(pathImg, Buffer.from(response.data));
+    await fs.writeFile(pathImg, Buffer.from(response.data));
 
     api.changeGroupImage(fs.createReadStream(pathImg), event.threadID, () => {
       fs.unlinkSync(pathImg);
