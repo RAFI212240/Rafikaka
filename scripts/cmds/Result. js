@@ -1,0 +1,167 @@
+const axios = require('axios');
+
+module.exports.config = {
+  name: "result",
+  version: "1.0.0",
+  hasPermission: 0,
+  credits: "Shaon Ahmed",
+  description: "Check SSC/HSC/JSC results from Education Board API",
+  commandCategory: "utility",
+  usages: "[Type: result → follow steps]",
+  cooldowns: 5
+};
+
+module.exports.run = async function({ api, event }) {
+  try {
+    const res = await axios.get("https://shaon-ssc-result.vercel.app/options");
+    const exams = res.data.examinations;
+
+    let msg = "📚 Select Exam:\n";
+    exams.forEach((exam, i) => {
+      msg += `${i + 1}. ${exam.name}\n`;
+    });
+
+    return api.sendMessage(msg, event.threadID, (err, info) => {
+      global.client.handleReply.push({
+        name: this.config.name,
+        messageID: info.messageID,
+        author: event.senderID,
+        type: "exam",
+        exams
+      });
+    }, event.messageID);
+  } catch {
+    return api.sendMessage("❌ Failed to fetch exam list.", event.threadID);
+  }
+};
+
+module.exports.handleReply = async function({ api, event, handleReply }) {
+  const { author, type } = handleReply;
+  if (event.senderID !== author) return;
+
+  try {
+    switch (type) {
+      case "exam": {
+        const selected = parseInt(event.body) - 1;
+        if (isNaN(selected) || selected < 0 || selected >= handleReply.exams.length)
+          return api.sendMessage("❌ Invalid exam selection.", event.threadID);
+
+        const exam = handleReply.exams[selected];
+        const res = await axios.get("https://shaon-ssc-result.vercel.app/options");
+        const boards = res.data.boards;
+
+        let msg = "🏫 Select Board:\n";
+        boards.forEach((b, i) => {
+          msg += `${i + 1}. ${b.name}\n`;
+        });
+
+        api.unsendMessage(handleReply.messageID);
+        return api.sendMessage(msg, event.threadID, (err, info) => {
+          global.client.handleReply.push({
+            name: module.exports.config.name,
+            messageID: info.messageID,
+            author,
+            type: "board",
+            boards,
+            exam: exam.value
+          });
+        });
+      }
+
+      case "board": {
+        const selected = parseInt(event.body) - 1;
+        if (isNaN(selected) || selected < 0 || selected >= handleReply.boards.length)
+          return api.sendMessage("❌ Invalid board selection.", event.threadID);
+
+        const board = handleReply.boards[selected];
+        api.unsendMessage(handleReply.messageID);
+        return api.sendMessage("📅 Enter Exam Year (e.g. 2024):", event.threadID, (err, info) => {
+          global.client.handleReply.push({
+            name: module.exports.config.name,
+            messageID: info.messageID,
+            author,
+            type: "year",
+            exam: handleReply.exam,
+            board: board.value
+          });
+        });
+      }
+
+      case "year": {
+        const year = event.body.trim();
+        if (!/^(20[0-9]{2})$/.test(year))
+          return api.sendMessage("❌ Invalid year.", event.threadID);
+
+        api.unsendMessage(handleReply.messageID);
+        return api.sendMessage("🧾 Enter Roll Number:", event.threadID, (err, info) => {
+          global.client.handleReply.push({
+            name: module.exports.config.name,
+            messageID: info.messageID,
+            author,
+            type: "roll",
+            exam: handleReply.exam,
+            board: handleReply.board,
+            year
+          });
+        });
+      }
+
+      case "roll": {
+        const roll = event.body.trim();
+        if (!/^[0-9]{3,10}$/.test(roll))
+          return api.sendMessage("❌ Invalid roll number.", event.threadID);
+
+        api.unsendMessage(handleReply.messageID);
+        return api.sendMessage("📝 Enter Registration Number:", event.threadID, (err, info) => {
+          global.client.handleReply.push({
+            name: module.exports.config.name,
+            messageID: info.messageID,
+            author,
+            type: "reg",
+            exam: handleReply.exam,
+            board: handleReply.board,
+            year: handleReply.year,
+            roll
+          });
+        });
+      }
+
+      case "reg": {
+        const reg = event.body.trim();
+        if (!/^[0-9]{3,15}$/.test(reg))
+          return api.sendMessage("❌ Invalid registration number.", event.threadID);
+
+        const { exam, board, year, roll } = handleReply;
+        const url = `https://shaon-ssc-result.vercel.app/result?exam=${exam}&board=${board}&year=${year}&roll=${roll}&reg=${reg}`;
+
+        api.unsendMessage(handleReply.messageID);
+
+        try {
+          const res = await axios.get(url);
+          const data = res.data;
+
+          if (!data.student) return api.sendMessage("❌ No result found.", event.threadID);
+
+          const student = data.student;
+          const grades = data.grades || [];
+
+          let msg = "🎓 𝗦𝘁𝘂𝗱𝗲𝗻𝘁 𝗜𝗻𝗳𝗼:\n";
+          for (const [key, value] of Object.entries(student)) {
+            msg += `${key}: ${value}\n`;
+          }
+
+          msg += "\n📖 𝗚𝗿𝗮𝗱𝗲 𝗦𝗵𝗲𝗲𝘁:\n";
+          grades.forEach(g => {
+            msg += `${g.subject} (${g.code}): ${g.grade}\n`;
+          });
+
+          return api.sendMessage(msg, event.threadID);
+        } catch {
+          return api.sendMessage("❌ Error fetching result.", event.threadID);
+        }
+      }
+    }
+  } catch (err) {
+    return api.sendMessage("❌ Something went wrong.", event.threadID);
+  }
+};
