@@ -1,101 +1,92 @@
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-
-const YTDL_PRIMARY_API = 'https://sus-apis.onrender.com/api/ytdlv3';
-const YTDL_FALLBACK_API = 'http://localhost:4000/api/ytdl-v4';
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+const { createCanvas, loadImage } = require("canvas");
+const crypto = require("crypto");
 
 module.exports = {
-  name: "ytdl",
-  description: "Download a YouTube video and send it to the user 📹",
-  usage: "!ytdl <YouTube URL>",
-  cooldown: 10,
-  adminOnly: false,
+  config: {
+    name: "pfpeffect",
+    aliases: ["circlepfp", "roundpfp"],
+    version: "1.0",
+    role: 0,
+    author: "Perplexity AI",
+    description: "🎨 Make your profile picture round with a soft shadow effect!",
+    category: "media",
+    countDown: 5,
+    guide: "Use {pn}pfpeffect [@mention]",
+  },
 
-  /**
-   * 
-   * @param {object} botApi - বটের API অবজেক্ট, যেটা মেসেজ পাঠানো, রিসিভ করার ফাংশন রাখে
-   * @param {object} event - ইভেন্ট অবজেক্ট, যেখানে মেসেজ, ইউজার, চ্যানেল/থ্রেড আইডি থাকে
-   * @param {array} args - কমান্ডের আর্গুমেন্টস (যেমন ইউটিউব ভিডিও URL)
-   */
-  async execute(botApi, event, args) {
-    const threadID = event.threadID || event.chatID || event.channelID;
-    const messageID = event.messageID || event.id;
-    const senderID = event.senderID || event.author;
+  onStart: async function ({ event, message, usersData, api, args }) {
+    const uid1 = event.senderID;
+    const uid2 = Object.keys(event.mentions)[0];
+    let uid = uid2 || uid1;
 
-    let filePath;
-    let progressMsgID = null;
+    // Get avatar URL
+    const avatarUrl = await usersData.getAvatarUrl(uid);
 
-    try {
-      if (!args[0]) {
-        return botApi.sendMessage(`❌ Please provide a YouTube video URL.\nUsage: ${this.usage}`, threadID, messageID);
-      }
+    // Download avatar
+    const avatarImg = await loadImage(avatarUrl);
 
-      const videoUrl = args[0].trim();
-      if (!videoUrl.startsWith('https://') || (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be'))) {
-        return botApi.sendMessage(`❌ Please provide a valid YouTube video URL.`, threadID, messageID);
-      }
+    // Canvas setup
+    const size = 512;
+    const canvas = createCanvas(size, size);
+    const ctx = canvas.getContext("2d");
 
-      // Send searching message
-      progressMsgID = await botApi.sendMessage(`🔍 Searching for video...`, threadID);
+    // Draw soft shadow
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 32;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 12, 0, Math.PI * 2, true);
+    ctx.closePath();
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.restore();
 
-      // Try primary API
-      let videoDownloadUrl, videoTitle;
-      try {
-        const apiUrl = `${YTDL_PRIMARY_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
-        const primaryResponse = await axios.get(apiUrl, { timeout: 20000 });
+    // Draw circular avatar
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 16, 0, Math.PI * 2, true);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(avatarImg, 0, 0, size, size);
+    ctx.restore();
 
-        if (primaryResponse.data && primaryResponse.data.success && primaryResponse.data.data && primaryResponse.data.data.downloadUrl) {
-          videoDownloadUrl = primaryResponse.data.data.downloadUrl;
-          videoTitle = primaryResponse.data.data.title || "YouTube Video";
-        } else {
-          throw new Error("Primary API did not return a valid MP4 URL");
-        }
-      } catch (err) {
-        // Fallback API
-        const fallbackApiUrl = `${YTDL_FALLBACK_API}?url=${encodeURIComponent(videoUrl)}&format=mp4`;
-        const fallbackResponse = await axios.get(fallbackApiUrl, { timeout: 20000 });
+    // Optional: Draw white border
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 16, 0, Math.PI * 2, true);
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
 
-        if (fallbackResponse.data && fallbackResponse.data.success && fallbackResponse.data.downloadUrl) {
-          videoDownloadUrl = fallbackResponse.data.downloadUrl;
-          videoTitle = fallbackResponse.data.title || "YouTube Video";
-        } else {
-          throw new Error("Fallback API did not return a valid MP4 URL");
-        }
-      }
+    // Save temp file
+    const tempDir = path.join(__dirname, "..", "..", "temp");
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+    const fileName = `pfpeffect_${crypto.randomBytes(8).toString("hex")}.png`;
+    const tempFile = path.join(tempDir, fileName);
 
-      // Edit progress message
-      if (progressMsgID) {
-        await botApi.editMessage && botApi.editMessage(`📥 Downloading video...`, progressMsgID, threadID);
-      }
+    const out = fs.createWriteStream(tempFile);
+    const stream = canvas.createPNGStream();
+    stream.pipe(out);
 
-      // Prepare temp file path
-      const tempDir = path.join(__dirname, '..', 'temp');
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-      const fileName = `ytdl_${crypto.randomBytes(8).toString('hex')}.mp4`;
-      filePath = path.join(tempDir, fileName);
+    await new Promise((resolve, reject) => {
+      out.on("finish", resolve);
+      out.on("error", reject);
+    });
 
-      // Download video stream
-      const videoResponse = await axios.get(videoDownloadUrl, {
-        responseType: 'stream',
-        timeout: 60000
-      });
+    // Send with mention (like your spy command)
+    const userInfo = await api.getUserInfo(uid);
+    message.reply({
+      body: `✨ Here is the round profile picture for @${userInfo[uid].name}`,
+      attachment: fs.createReadStream(tempFile),
+      mentions: [{
+        tag: `@${userInfo[uid].name}`,
+        id: uid,
+      }]
+    });
 
-      const contentType = videoResponse.headers['content-type'];
-      if (!contentType || (!contentType.startsWith('video/') && contentType !== 'application/octet-stream')) {
-        throw new Error(`Unexpected Content-Type: ${contentType}`);
-      }
-
-      const writer = fs.createWriteStream(filePath);
-      videoResponse.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-
-      const stats = fs.statSync(filePath);
-      if (stats.size === 0) throw new Error("Downloaded video file is empty");
-
-      // Edit progress message again
+    // Clean up
+    fs.unlinkSync(tempFile);
+  },
+};
