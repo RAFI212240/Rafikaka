@@ -1,23 +1,20 @@
-const fs = require("fs");
-const request = require("request");
-const path = require("path");
+module.exports = {
+  config: {
+    name: "admin",
+    version: "2.0.0",
+    author: "Abdulla Rahaman",
+    description: "Show admin info with image (no cache needed)",
+    category: "info",
+    cooldowns: 2,
+    guide: "Use {pn}admin"
+  },
 
-async function adminCommand(api, threadID, messageID) {
-  const links = [
-    "https://i.imgur.com/0Z6GQvF.jpg",
-    "https://i.imgur.com/3g7nmJC.jpg"
-  ];
-  const imgURL = links[Math.floor(Math.random() * links.length)];
-  const filePath = path.join(__dirname, "admin.jpg");
+  onStart: async function ({ message }) {
+    // ইমেজ লিংক (Imgur album লিংক নয়, ডাইরেক্ট লিংক)
+    const imgURL = "https://i.imgur.com/0Z6GQvF.jpg";
 
-  await new Promise((resolve, reject) => {
-    request(imgURL)
-      .pipe(fs.createWriteStream(filePath))
-      .on("finish", resolve)
-      .on("error", reject);
-  });
-
-  const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
+    // টেক্সট বডি
+    const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
 ------------------------------------------------
 𝗡𝗮𝗺𝗲       : R A F Iメ
 𝗙𝗮𝗰𝗲𝗯𝗼𝗼𝗸 :   RAFI 卝 চৌধুরীヅ
@@ -33,10 +30,11 @@ async function adminCommand(api, threadID, messageID) {
 𝗧𝗲𝗹𝗲𝗴𝗿𝗮𝗺  : t.me/R_A_F_I_Official
 𝗙𝗯 𝗹𝗶𝗻𝗸   : https://www.facebook.com/share/16BbdkmzJo/`;
 
-  await api.sendMessage({
-    body,
-    attachment: fs.createReadStream(filePath)
-  }, threadID, () => fs.unlinkSync(filePath), messageID);
-}
-
-// ব্যবহার: adminCommand(api, event.threadID, event.messageID);
+    // সরাসরি ইমেজ লিংক অ্যাটাচমেন্ট হিসেবে পাঠানো
+    await message.reply({
+      body,
+      attachment: [imgURL]
+    });
+  }
+};
+    
