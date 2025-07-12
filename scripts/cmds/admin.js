@@ -1,4 +1,3 @@
-const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
 const request = require("request");
@@ -15,27 +14,26 @@ module.exports = {
     guide: "Use {pn}admin to get admin info.",
     dependencies: {
       "request": "",
-      "fs-extra": "",
-      "axios": ""
+      "fs-extra": ""
     }
   },
 
   onStart: async function ({ message }) {
-    // Random image link
+    // ডাইরেক্ট ইমেজ লিংক দিন (Imgur album লিংক নয়)
     const links = [
       "https://i.imgur.com/0Z6GQvF.jpg",
       "https://i.imgur.com/3g7nmJC.jpg"
-      // চাইলে আরও লিংক যোগ করুন (Imgur direct image link ব্যবহার করুন)
+      // চাইলে আরও লিংক যোগ করুন
     ];
     const imgURL = links[Math.floor(Math.random() * links.length)];
 
-    // Temp file path
+    // cache ফোল্ডার ব্যবহার
     const tempDir = path.join(__dirname, "..", "..", "cache");
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
     const fileName = `admin_${crypto.randomBytes(6).toString("hex")}.jpg`;
     const filePath = path.join(tempDir, fileName);
 
-    // Download image
+    // ইমেজ ডাউনলোড
     await new Promise((resolve, reject) => {
       request(imgURL)
         .pipe(fs.createWriteStream(filePath))
@@ -43,7 +41,7 @@ module.exports = {
         .on("error", reject);
     });
 
-    // Message body
+    // মেসেজ টেক্সট
     const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
 ------------------------------------------------
 𝗡𝗮𝗺𝗲       : R A F Iメ
@@ -60,14 +58,14 @@ module.exports = {
 𝗧𝗲𝗹𝗲𝗴𝗿𝗮𝗺  : t.me/R_A_F_I_Official
 𝗙𝗯 𝗹𝗶𝗻𝗸   : https://www.facebook.com/share/16BbdkmzJo/`;
 
-    // Send message with image
+    // মেসেজ পাঠান
     await message.reply({
       body,
       attachment: fs.createReadStream(filePath)
     });
 
-    // Delete temp file
+    // টেম্প ফাইল ডিলিট করুন
     fs.unlinkSync(filePath);
   }
 };
-	      
+	    
