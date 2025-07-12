@@ -1,7 +1,6 @@
 const fs = require("fs-extra");
 const path = require("path");
 const request = require("request");
-const crypto = require("crypto");
 
 module.exports = {
   config: {
@@ -27,8 +26,8 @@ module.exports = {
     ];
     const imgURL = links[Math.floor(Math.random() * links.length)];
 
-    // cache ফোল্ডার ব্যবহার
-    const tempDir = path.join(__dirname, "..", "..", "cache");
+    // cache ফোল্ডার ব্যবহার (রুটে থাকতে হবে)
+    const tempDir = path.join(process.cwd(), "cache");
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
     const fileName = `admin_${crypto.randomBytes(6).toString("hex")}.jpg`;
     const filePath = path.join(tempDir, fileName);
