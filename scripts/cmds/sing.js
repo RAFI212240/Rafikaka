@@ -2,157 +2,109 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
-const baseApiUrl = async () => {
-  const base = await axios.get(
-    `https://raw.githubusercontent.com/Blankid018/D1PT0/main/baseApiUrl.json`
-  );
-  return base.data.api;
-};
+const apiKey = "66e0cfbb-62b8-4829-90c7-c78cacc72ae2";
+let searchCache = {};
 
-module.exports.config = {
-  name: "song",
-  version: "2.1.0",
-  aliases: ["music", "play"],
-  credits: "dipto",
-  hasPermssion: 0,
-  description: "Download audio from YouTube",
-  commandCategory: "media",
-  usages:
-    "{pn} [<song name>|<song link>]\nExample:\n{pn} chipi chipi chapa chapa",
-  cooldowns: 5,
-};
+module.exports = {
+  config: {
+    name: "sing",
+    version: "1.1",
+    role: 0,
+    author: "nexo_here",
+    category: "music",
+    shortDescription: "Search and play SoundCloud songs",
+    longDescription: "Searches for a song using SoundCloud API and lets you play any of the top 4 results",
+    guide: "{pn} <song name>"
+  },
 
-module.exports.run = async function ({ api, event, args, handleReply }) {
-  const checkurl =
-    /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))((\w|-){11})(?:\S+)?$/;
+  onStart: async function ({ api, event, args }) {
+    const query = args.join(" ");
+    if (!query) return api.sendMessage("❌ Please enter a song title.", event.threadID, event.messageID);
 
-  if (!args.length)
-    return api.sendMessage(
-      "❌ Please enter a YouTube link or a song name to search.",
-      event.threadID,
-      event.messageID
-    );
-
-  let videoID;
-  const urlYtb = checkurl.test(args[0]);
-
-  if (urlYtb) {
-    // If user sends a YouTube URL directly
-    const match = args[0].match(checkurl);
-    videoID = match ? match[1] : null;
+    const searchUrl = `https://kaiz-apis.gleeze.com/api/soundcloud-search?title=${encodeURIComponent(query)}&apikey=${apiKey}`;
 
     try {
-      const { data } = await axios.get(
-        `${await baseApiUrl()}/ytDl3?link=${videoID}&format=mp3`
-      );
+      const res = await axios.get(searchUrl);
+      const results = res.data?.results;
 
-      const title = data.title;
-      const downloadLink = data.downloadLink;
+      if (!results || results.length === 0) {
+        return api.sendMessage("❌ No songs found.", event.threadID, event.messageID);
+      }
 
-      const audioPath = path.resolve(__dirname, "audio.mp3");
+      const top4 = results.slice(0, 4);
+      let msg = `🎵 Search results for: "${query}"\n\n`;
 
-      await downloadFile(downloadLink, audioPath);
-
-      return api.sendMessage(
-        {
-          body: `🎵 Now playing: ${title}`,
-          attachment: fs.createReadStream(audioPath),
-        },
-        event.threadID,
-        () => fs.unlinkSync(audioPath),
-        event.messageID
-      );
-    } catch (err) {
-      return api.sendMessage(
-        `❌ Error: ${err.message}`,
-        event.threadID,
-        event.messageID
-      );
-    }
-  } else {
-    // If user sends a search keyword
-    let keyWord = args.join(" ");
-    keyWord = keyWord.replace("?feature=share", "");
-
-    try {
-      const maxResults = 6;
-      const { data } = await axios.get(
-        `${await baseApiUrl()}/ytFullSearch?songName=${encodeURIComponent(
-          keyWord
-        )}`
-      );
-
-      const results = data.slice(0, maxResults);
-
-      if (!results.length)
-        return api.sendMessage(
-          `⭕ No search results for: ${keyWord}`,
-          event.threadID,
-          event.messageID
-        );
-
-      let msg = "🔍 Search results:\n\n";
-      const attachments = [];
-
-      results.forEach((item, index) => {
-        msg += `${index + 1}. ${item.title}\nTime: ${item.time}\nChannel: ${
-          item.channel.name
-        }\n\n`;
-        attachments.push(
-          axios
-            .get(item.thumbnail, { responseType: "arraybuffer" })
-            .then((res) => {
-              const imagePath = path.resolve(
-                __dirname,
-                `thumb_${index}.jpg`
-              );
-              fs.writeFileSync(imagePath, Buffer.from(res.data));
-              return fs.createReadStream(imagePath);
-            })
-        );
+      top4.forEach((song, index) => {
+        msg += `${index + 1}. ${song.title} — ${song.artist} (${song.duration})\n`;
       });
 
-      const resolvedAttachments = await Promise.all(attachments);
+      msg += `\nReply with a number (1-4) to play the song.`;
+      searchCache[event.senderID] = top4;
 
-      return api.sendMessage(
-        {
-          body: msg + "Reply with the number of the song you want to listen to.",
-          attachment: resolvedAttachments,
-        },
-        event.threadID,
-        (err, info) => {
-          if (err) return console.error(err);
-          global.client.handleReply.push({
-            name: this.config.name,
-            messageID: info.messageID,
-            author: event.senderID,
-            results,
-          });
-        },
-        event.messageID
-      );
+      return api.sendMessage(msg, event.threadID, (err, info) => {
+        global.GoatBot.onReply.set(info.messageID, {
+          commandName: "sing",
+          author: event.senderID,
+          messageID: info.messageID // store for unsend
+        });
+      });
+
     } catch (err) {
-      return api.sendMessage(
-        `❌ An error occurred: ${err.message}`,
-        event.threadID,
-        event.messageID
-      );
+      console.error(err);
+      return api.sendMessage("❌ Failed to fetch songs.", event.threadID, event.messageID);
+    }
+  },
+
+  onReply: async function ({ api, event, Reply }) {
+    if (event.senderID !== Reply.author) return;
+
+    const choice = parseInt(event.body);
+    if (isNaN(choice) || choice < 1 || choice > 4) {
+      return api.sendMessage("❌ Please reply with a number between 1 and 4.", event.threadID, event.messageID);
+    }
+
+    const selected = searchCache[event.senderID][choice - 1];
+    if (!selected) return api.sendMessage("❌ Song not found in cache.", event.threadID, event.messageID);
+
+    const dlUrl = `https://kaiz-apis.gleeze.com/api/soundcloud-dl?url=${encodeURIComponent(selected.url)}&apikey=${apiKey}`;
+
+    try {
+      const dlRes = await axios.get(dlUrl);
+      const audioUrl = dlRes.data?.downloadUrl;
+      const title = dlRes.data?.title || selected.title;
+
+      if (!audioUrl) return api.sendMessage("❌ Couldn't fetch download URL.", event.threadID, event.messageID);
+
+      const filePath = path.join(__dirname, "tmp", `${Date.now()}.mp3`);
+      const writer = fs.createWriteStream(filePath);
+
+      const audioStream = await axios({
+        url: audioUrl,
+        method: "GET",
+        responseType: "stream"
+      });
+
+      audioStream.data.pipe(writer);
+
+      writer.on("finish", () => {
+        // Unsend the search message before sending the audio
+        api.unsendMessage(Reply.messageID, (err) => {
+          if (err) console.log("⚠️ Failed to unsend search message:", err);
+
+          api.sendMessage({
+            body: `🎶 Now Playing: ${title}`,
+            attachment: fs.createReadStream(filePath)
+          }, event.threadID, () => fs.unlinkSync(filePath), event.messageID);
+        });
+      });
+
+      writer.on("error", () => {
+        return api.sendMessage("❌ Failed to download song.", event.threadID, event.messageID);
+      });
+
+    } catch (err) {
+      console.error(err);
+      return api.sendMessage("❌ Error playing the song.", event.threadID, event.messageID);
     }
   }
 };
-
-module.exports.handleReply = async function ({ api, event, handleReply }) {
-  try {
-    const { results } = handleReply;
-    const choice = parseInt(event.body);
-
-    if (isNaN(choice) || choice < 1 || choice > results.length)
-      return api.sendMessage(
-        `❌ Invalid choice. Please enter a number between 1 and ${results.length}.`,
-        event.threadID,
-        event.messageID
-      );
-
-    const selected = results[choice - 1];
-    const videoID =
-                         
