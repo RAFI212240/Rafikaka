@@ -1,47 +1,23 @@
-const fs = require("fs-extra");
-const path = require("path");
+const fs = require("fs");
 const request = require("request");
+const path = require("path");
 
-module.exports = {
-  config: {
-    name: "admin",
-    version: "1.0.1",
-    author: "Abdulla Rahaman",
-    description: "Abdulla Tech 49",
-    commandCategory: "info",
-    cooldowns: 1,
-    guide: "Use {pn}admin to get admin info.",
-    dependencies: {
-      "request": "",
-      "fs-extra": ""
-    }
-  },
+async function adminCommand(api, threadID, messageID) {
+  const links = [
+    "https://i.imgur.com/0Z6GQvF.jpg",
+    "https://i.imgur.com/3g7nmJC.jpg"
+  ];
+  const imgURL = links[Math.floor(Math.random() * links.length)];
+  const filePath = path.join(__dirname, "admin.jpg");
 
-  onStart: async function ({ message }) {
-    // ডাইরেক্ট ইমেজ লিংক দিন (Imgur album লিংক নয়)
-    const links = [
-      "https://i.imgur.com/0Z6GQvF.jpg",
-      "https://i.imgur.com/3g7nmJC.jpg"
-      // চাইলে আরও লিংক যোগ করুন
-    ];
-    const imgURL = links[Math.floor(Math.random() * links.length)];
+  await new Promise((resolve, reject) => {
+    request(imgURL)
+      .pipe(fs.createWriteStream(filePath))
+      .on("finish", resolve)
+      .on("error", reject);
+  });
 
-    // cache ফোল্ডার ব্যবহার (রুটে থাকতে হবে)
-    const tempDir = path.join(process.cwd(), "cache");
-    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-    const fileName = `admin_${crypto.randomBytes(6).toString("hex")}.jpg`;
-    const filePath = path.join(tempDir, fileName);
-
-    // ইমেজ ডাউনলোড
-    await new Promise((resolve, reject) => {
-      request(imgURL)
-        .pipe(fs.createWriteStream(filePath))
-        .on("finish", resolve)
-        .on("error", reject);
-    });
-
-    // মেসেজ টেক্সট
-    const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
+  const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
 ------------------------------------------------
 𝗡𝗮𝗺𝗲       : R A F Iメ
 𝗙𝗮𝗰𝗲𝗯𝗼𝗼𝗸 :   RAFI 卝 চৌধুরীヅ
@@ -57,14 +33,10 @@ module.exports = {
 𝗧𝗲𝗹𝗲𝗴𝗿𝗮𝗺  : t.me/R_A_F_I_Official
 𝗙𝗯 𝗹𝗶𝗻𝗸   : https://www.facebook.com/share/16BbdkmzJo/`;
 
-    // মেসেজ পাঠান
-    await message.reply({
-      body,
-      attachment: fs.createReadStream(filePath)
-    });
+  await api.sendMessage({
+    body,
+    attachment: fs.createReadStream(filePath)
+  }, threadID, () => fs.unlinkSync(filePath), messageID);
+}
 
-    // টেম্প ফাইল ডিলিট করুন
-    fs.unlinkSync(filePath);
-  }
-};
-	    
+// ব্যবহার: adminCommand(api, event.threadID, event.messageID);
