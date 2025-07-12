@@ -1,34 +1,21 @@
-const fs = require("fs-extra");
-const request = require("request");
-const path = require("path");
+module.exports = {
+  config: {
+    name: "admin",
+    version: "2.0.0",
+    author: "Abdulla Rahaman",
+    description: "Show admin info with random image",
+    category: "info",
+    cooldowns: 2,
+    guide: "Use {pn}admin"
+  },
 
-module.exports.config = {
-  name: "test",
-  version: "1.0.1",
-  hasPermssion: 0,
-  credits: "Abdulla Rahaman",
-  description: "Show admin info",
-  commandCategory: "info",
-  usages: "",
-  cooldowns: 1
-};
-
-module.exports.run = async function({ api, event }) {
-  const links = [
-    "https://i.imgur.com/0Z6GQvF.jpg",
-    "https://i.imgur.com/3g7nmJC.jpg"
-  ];
-  const imgURL = links[Math.floor(Math.random() * links.length)];
-  const filePath = path.join(__dirname, "admin.jpg");
-
-  await new Promise((resolve, reject) => {
-    request(imgURL)
-      .pipe(fs.createWriteStream(filePath))
-      .on("finish", resolve)
-      .on("error", reject);
-  });
-
-  const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
+  onStart: async function ({ message }) {
+    const links = [
+      "https://i.imgur.com/0Z6GQvF.jpg",
+      "https://i.imgur.com/3g7nmJC.jpg"
+    ];
+    const imgURL = links[Math.floor(Math.random() * links.length)];
+    const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
 ------------------------------------------------
 𝗡𝗮𝗺𝗲       : R A F Iメ
 𝗙𝗮𝗰𝗲𝗯𝗼𝗼𝗸 :   RAFI 卝 চৌধুরীヅ
@@ -43,10 +30,9 @@ module.exports.run = async function({ api, event }) {
 𝗪𝗵𝗮𝘁𝘀𝗔𝗽𝗽 :  private 😑
 𝗧𝗲𝗹𝗲𝗴𝗿𝗮𝗺  : t.me/R_A_F_I_Official
 𝗙𝗯 𝗹𝗶𝗻𝗸   : https://www.facebook.com/share/16BbdkmzJo/`;
-
-  api.sendMessage({
-    body,
-    attachment: fs.createReadStream(filePath)
-  }, event.threadID, () => fs.unlinkSync(filePath), event.messageID);
+    await message.reply({
+      body,
+      attachment: [imgURL]
+    });
+  }
 };
-                    
