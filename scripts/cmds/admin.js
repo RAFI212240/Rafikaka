@@ -3,17 +3,22 @@ module.exports = {
     name: "admin",
     version: "2.0.0",
     author: "Abdulla Rahaman",
-    description: "Show admin info with image (no cache needed)",
+    description: "Show admin info with direct image (no cache needed)",
     category: "info",
-    cooldowns: 2,
-    guide: "Use {pn}admin"
+    cooldowns: 1,
+    guide: "Use {pn}admin to get admin info."
   },
 
   onStart: async function ({ message }) {
-    // ইমেজ লিংক (Imgur album লিংক নয়, ডাইরেক্ট লিংক)
-    const imgURL = "https://i.imgur.com/0Z6GQvF.jpg";
+    // ডাইরেক্ট ইমেজ লিংক (Imgur album লিংক নয়)
+    const links = [
+      "https://i.imgur.com/0Z6GQvF.jpg",
+      "https://i.imgur.com/3g7nmJC.jpg"
+      // চাইলে আরও লিংক যোগ করুন
+    ];
+    const imgURL = links[Math.floor(Math.random() * links.length)];
 
-    // টেক্সট বডি
+    // মেসেজ টেক্সট
     const body = `𝗗𝗢 𝗡𝗢𝗧 𝗧𝗥𝗨𝗦𝗧 𝗧𝗛𝗘 𝗕𝗢𝗧 𝗢𝗣𝗘𝗥𝗔𝗧𝗢𝗥
 ------------------------------------------------
 𝗡𝗮𝗺𝗲       : R A F Iメ
@@ -30,11 +35,10 @@ module.exports = {
 𝗧𝗲𝗹𝗲𝗴𝗿𝗮𝗺  : t.me/R_A_F_I_Official
 𝗙𝗯 𝗹𝗶𝗻𝗸   : https://www.facebook.com/share/16BbdkmzJo/`;
 
-    // সরাসরি ইমেজ লিংক অ্যাটাচমেন্ট হিসেবে পাঠানো
+    // সরাসরি ইমেজ URL দিয়ে মেসেজ পাঠান
     await message.reply({
       body,
-      attachment: [imgURL]
+      attachment: await global.utils.getStreamFromURL(imgURL)
     });
   }
 };
-    
